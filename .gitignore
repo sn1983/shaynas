@@ -1,0 +1,4 @@
+node_modules/
+.env
+# Holds real phone numbers — keep it out of the repository.
+config/recipients.json

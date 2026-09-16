@@ -1,0 +1,16 @@
+{
+  "name": "morning-sms",
+  "version": "1.0.0",
+  "description": "Sends a good-morning SMS to the kids every day at 07:00 Israel time",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "send": "node --env-file-if-exists=.env src/send.js",
+    "send:now": "node --env-file-if-exists=.env src/send.js --force",
+    "dry-run": "node --env-file-if-exists=.env src/send.js --force --dry-run",
+    "test": "node --test test/*.test.js"
+  },
+  "license": "MIT"
+}
