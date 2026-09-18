@@ -1,0 +1,16 @@
+{
+  "name": "glglz-artist-watch",
+  "version": "1.0.0",
+  "description": "Notifies whenever Imagine Dragons plays on Galgalatz",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "check": "node src/check.js",
+    "watch": "node src/check.js --watch",
+    "feed": "node src/feed-dump.js",
+    "test": "node --test \"test/**/*.test.js\""
+  }
+}

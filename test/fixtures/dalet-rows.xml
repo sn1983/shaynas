@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<XML>
+  <ROW>
+    <TITLE>Believer</TITLE>
+    <ARTIST>Imagine Dragons</ARTIST>
+    <TIME>10:04</TIME>
+    <IMAGE>https://example.com/cover.jpg</IMAGE>
+  </ROW>
+  <ROW>
+    <TITLE>Wonderwall</TITLE>
+    <ARTIST>Oasis</ARTIST>
+    <TIME>10:00</TIME>
+  </ROW>
+</XML>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<onair>
+  <current>
+    <nowplaying><![CDATA[Imagine Dragons - Radioactive]]></nowplaying>
+    <hour>11:20</hour>
+    <program>הבוקר של גלגלצ</program>
+  </current>
+  <previous>
+    <item><artist>Coldplay</artist><title>Yellow</title><time>11:15</time></item>
+  </previous>
+</onair>

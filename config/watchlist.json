@@ -1,0 +1,18 @@
+{
+  "feedUrl": "https://glzxml.blob.core.windows.net/dalet/glglz-onair/onair.xml",
+  "pollSeconds": 45,
+  "dedupeMinutes": 30,
+  "artists": [
+    {
+      "name": "Imagine Dragons",
+      "aliases": [
+        "imagine dragons",
+        "imagine dragon",
+        "אימג'ין דרגונס",
+        "אימג'ין דראגונס",
+        "אימאג'ין דרגונס",
+        "אימג'ן דרגונס"
+      ]
+    }
+  ]
+}

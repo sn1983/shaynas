@@ -1,0 +1,72 @@
+name: Imagine Dragons on air
+
+on:
+  schedule:
+    # Every five minutes - the shortest interval GitHub accepts. Scheduled runs
+    # only fire from the repository's default branch, and GitHub may delay them
+    # when it is busy.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Print the notification instead of sending it'
+        type: boolean
+        default: true
+      duration:
+        description: 'Keep polling for this long (e.g. 4m). Empty = a single look.'
+        type: string
+        default: ''
+      verbose:
+        description: 'Print every song on the feed'
+        type: boolean
+        default: true
+
+# One run at a time, so two of them cannot report the same song.
+concurrency:
+  group: imagine-dragons-on-air
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Which songs were already reported. Restored from the previous run and
+      # saved again below, so a song that stays on the feed is reported once.
+      - name: Restore reported songs
+        id: state
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: onair-state-${{ github.run_id }}
+          restore-keys: onair-state-
+
+      - name: Look at the feed
+        env:
+          NOTIFIERS: ${{ vars.NOTIFIERS || 'telegram' }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
+          PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ vars.NTFY_SERVER }}
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+          NOTIFY_WEBHOOK_URL: ${{ secrets.NOTIFY_WEBHOOK_URL }}
+        run: |
+          node src/check.js \
+            ${{ inputs.duration && format('--watch --duration {0}', inputs.duration) || '' }} \
+            ${{ inputs.dry_run && '--dry-run' || '' }} \
+            ${{ inputs.verbose && '--verbose' || '' }}
+
+      - name: Save reported songs
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: onair-state-${{ github.run_id }}
