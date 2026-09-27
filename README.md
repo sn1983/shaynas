@@ -12,18 +12,12 @@
 
 ## איך מקבלים את קבצי ההתקנה
 
-הבנייה מתבצעת אוטומטית ב-GitHub Actions בכל push:
+הבנייה מתבצעת אוטומטית ב-GitHub Actions בכל push, והקבצים מתפרסמים בעמוד **Releases** של המאגר:
 
-1. נכנסים ללשונית **Actions** במאגר ← הריצה האחרונה של **Build apps**.
-2. בתחתית העמוד, תחת **Artifacts**, מורידים:
-   - `shay-radio-windows` – תוכנת ההתקנה ל-Windows.
-   - `shay-radio-android` – קובץ ה-APK לטלפון.
-
-כדי ליצור **Release** קבוע עם שני הקבצים, דוחפים תגית גרסה:
-
-```bash
-git tag v1.0.0 && git push origin v1.0.0
-```
+1. נכנסים ל-https://github.com/sn1983/shaynas/releases
+2. בגרסה העליונה (Latest), תחת **Assets**, מורידים:
+   - `shay-radio-setup-<גרסה>.exe` – תוכנת ההתקנה ל-Windows.
+   - `shay-radio.apk` – האפליקציה לטלפון Android.
 
 ### התקנה ב-Windows
 מריצים את קובץ ה-`exe`. אם מופיעה הודעת SmartScreen ("Windows protected your PC") לוחצים **More info ← Run anyway** (הקובץ אינו חתום דיגיטלית).
