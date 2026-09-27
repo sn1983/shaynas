@@ -47,10 +47,25 @@ jobs:
       - run: npx cap sync android
       - name: Build APK
         working-directory: android
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
-          mv app/build/outputs/apk/debug/app-debug.apk ../shay-radio.apk
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            # Signed release build with the app's permanent key.
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
+            ./gradlew assembleRelease --no-daemon
+            mv app/build/outputs/apk/release/app-release.apk ../shay-radio.apk
+          else
+            echo "::warning::ANDROID_KEYSTORE_BASE64 secret is not set - building a debug-signed APK."
+            ./gradlew assembleDebug --no-daemon
+            mv app/build/outputs/apk/debug/app-debug.apk ../shay-radio.apk
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: shay-radio-android
