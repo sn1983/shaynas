@@ -10,6 +10,13 @@ const APP_NAME = 'הרדיו של שי';
 
 // Let the radio start playing without requiring an extra click.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+// Never slow down or suspend the page (and its audio stream) while the window
+// is minimized or hidden to the tray.
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('disable-background-media-suspend');
+app.commandLine.appendSwitch('disable-features', 'IntensiveWakeUpThrottling,CalculateNativeWinOcclusion');
 app.setName(APP_NAME);
 if (process.platform === 'win32') app.setAppUserModelId('il.shayradio.app');
 
@@ -81,6 +88,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      preload: path.join(__dirname, 'preload.js'),
       // Keep the audio playing when the window is minimized.
       backgroundThrottling: false,
     },
