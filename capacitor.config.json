@@ -1,0 +1,14 @@
+{
+  "appId": "il.shayradio.app",
+  "appName": "הרדיו של שי",
+  "webDir": "www",
+  "server": {
+    "url": "https://shay-radio-il.netlify.app/",
+    "errorPath": "offline.html",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#1a1033"
+  }
+}

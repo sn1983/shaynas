@@ -1,0 +1,53 @@
+{
+  "name": "shay-radio",
+  "productName": "הרדיו של שי",
+  "version": "1.0.0",
+  "description": "הרדיו של שי - אפליקציה עבור Windows ו-Android המציגה את האתר https://shay-radio-il.netlify.app/",
+  "main": "electron/main.js",
+  "author": "sn1983",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android"
+  },
+  "build": {
+    "appId": "il.shayradio.app",
+    "productName": "הרדיו של שי",
+    "artifactName": "shay-radio-setup-${version}.${ext}",
+    "files": [
+      "electron/**/*",
+      "www/**/*",
+      "build/icon.png"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "הרדיו של שי"
+    }
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.0.0",
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  }
+}

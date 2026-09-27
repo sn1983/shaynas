@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>הרדיו של שי</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    background: #1a1033; color: #fff; text-align: center;
+    font-family: "Segoe UI", Arial, sans-serif; padding: 16px; box-sizing: border-box;
+  }
+  h1 { font-size: 1.8rem; margin: 0 0 .5rem; }
+  p { opacity: .85; margin: 0 0 1.5rem; }
+  button {
+    font: inherit; font-size: 1.1rem; padding: .7rem 2rem; border: 0; border-radius: 999px;
+    background: #ff7a45; color: #fff; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <div>
+    <div style="font-size:4rem">📻</div>
+    <h1>הרדיו של שי</h1>
+    <p>אין חיבור לאינטרנט כרגע.<br>בדקו את החיבור ונסו שוב.</p>
+    <button id="retry">נסו שוב</button>
+  </div>
+<script>
+  var SITE = 'https://shay-radio-il.netlify.app/';
+  var target = new URLSearchParams(location.search).get('retry') || SITE;
+  if (target.indexOf(SITE) !== 0) target = SITE;
+  function go() { location.href = target; }
+  document.getElementById('retry').onclick = go;
+  window.addEventListener('online', go);
+</script>
+</body>
+</html>
