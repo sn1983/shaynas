@@ -1,7 +1,7 @@
 // הרדיו של שי - Windows desktop wrapper.
 // The app always loads the live website, so any change published to the site
 // shows up in the app immediately without reinstalling.
-const { app, BrowserWindow, shell, Menu, Tray, nativeImage, session } = require('electron');
+const { app, BrowserWindow, shell, Menu, Tray, nativeImage, session, ipcMain } = require('electron');
 const path = require('path');
 
 const SITE_URL = 'https://shay-radio-il.netlify.app/';
@@ -39,18 +39,50 @@ function showWindow() {
   mainWindow.focus();
 }
 
-// Icon next to the clock (system tray) so the app can always be reopened
-// while the radio keeps playing in the background.
-function createTray() {
-  const icon = nativeImage.createFromPath(ICON_PATH).resize({ width: 32, height: 32 });
-  tray = new Tray(icon);
-  tray.setToolTip(APP_NAME);
+// Fixed id so Windows remembers the user's "always show this icon" choice.
+const TRAY_GUID = '6f1f6a0e-3c1b-4f7e-9a53-5d8a2b7c41e2';
+
+let isPlaying = false;
+
+function radioCommand(cmd) {
+  if (!mainWindow) return Promise.resolve(false);
+  return mainWindow.webContents
+    .executeJavaScript(`window.__shayRadio ? window.__shayRadio.${cmd}() : false`, true)
+    .catch(() => false);
+}
+
+// Play/stop from the tray. If the site hasn't started a player yet, open the
+// window so the user can pick what to play.
+async function togglePlayback() {
+  const handled = await radioCommand('toggle');
+  if (!handled) showWindow();
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+  tray.setToolTip(isPlaying ? `${APP_NAME} - מנגן` : APP_NAME);
   tray.setContextMenu(Menu.buildFromTemplate([
+    isPlaying
+      ? { label: '⏸  עצור', click: () => radioCommand('stop') }
+      : { label: '▶  נגן', click: togglePlayback },
+    { type: 'separator' },
     { label: 'פתח את הרדיו של שי', click: showWindow },
     { label: 'רענן', click: () => { showWindow(); loadSite(); } },
     { type: 'separator' },
     { label: 'יציאה', click: () => { isQuitting = true; app.quit(); } },
   ]));
+}
+
+// Icon next to the clock (system tray): always there while the app runs, so the
+// radio can be played/stopped and the window reopened at any time.
+function createTray() {
+  const icon = nativeImage.createFromPath(ICON_PATH).resize({ width: 32, height: 32 });
+  try {
+    tray = process.platform === 'win32' ? new Tray(icon, TRAY_GUID) : new Tray(icon);
+  } catch {
+    tray = new Tray(icon);
+  }
+  updateTrayMenu();
   tray.on('click', () => {
     if (mainWindow && mainWindow.isVisible() && !mainWindow.isMinimized()) {
       mainWindow.hide();
@@ -61,6 +93,11 @@ function createTray() {
   tray.on('double-click', showWindow);
 }
 
+ipcMain.on('radio-state', (_e, playing) => {
+  isPlaying = Boolean(playing);
+  updateTrayMenu();
+});
+
 function isInternal(url) {
   try {
     return new URL(url).origin === SITE_ORIGIN;
@@ -70,6 +107,8 @@ function isInternal(url) {
 }
 
 function loadSite() {
+  isPlaying = false;
+  updateTrayMenu();
   mainWindow.loadURL(SITE_URL).catch(() => {});
 }
 
@@ -113,7 +152,7 @@ function createWindow() {
       tray.displayBalloon({
         iconType: 'info',
         title: APP_NAME,
-        content: 'הרדיו ממשיך לנגן ברקע. לחצו על האייקון ליד השעון כדי לפתוח, או קליק ימני ← יציאה.',
+        content: 'הרדיו ממשיך לנגן ברקע. קליק ימני על האייקון ליד השעון: נגן / עצור / יציאה.',
       });
     }
   });
