@@ -5,10 +5,10 @@
   "server": {
     "url": "https://shay-radio-il.netlify.app/",
     "errorPath": "offline.html",
-    "cleartext": false
+    "cleartext": true
   },
   "android": {
-    "allowMixedContent": false,
+    "allowMixedContent": true,
     "backgroundColor": "#1a1033"
   }
 }

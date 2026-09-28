@@ -48,25 +48,30 @@ webFrame.executeJavaScript(`(${function keepPlaying() {
   document.addEventListener('play', (e) => { track(e.target); report(); }, true);
   setInterval(() => { scan(); report(); }, 2000);
 
-  // Used by the tray menu.
+  // Used by the tray menu. Prefer the site's own controls so its screen stays in sync.
   window.__shayRadio = {
     stop() {
+      const btn = document.getElementById('stopBtn');
+      if (btn) btn.click();
       scan();
       media.forEach((el) => { if (!el.paused) el.pause(); });
+      return true;
     },
     play() {
+      // Re-tune the current station so it reconnects to the live broadcast.
+      if (typeof selectStation === 'function' && typeof currentIndex === 'number' && currentIndex >= 0) {
+        selectStation(currentIndex);
+        return true;
+      }
       scan();
       const el = lastPlayed || [...media][0];
       if (!el) return false;
-      // Live stream: reconnect so playback resumes "live" instead of from an old buffer.
-      if (el.src && !el.src.startsWith('blob:') && !Number.isFinite(el.duration)) el.load();
       el.play().catch(() => {});
       return true;
     },
     toggle() {
       scan();
-      if (isPlaying()) { this.stop(); return true; }
-      return this.play();
+      return isPlaying() ? this.stop() : this.play();
     },
   };
 }})();`);
