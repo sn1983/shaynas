@@ -1,7 +1,7 @@
 // הרדיו של שי - Windows desktop wrapper.
 // The app always loads the live website, so any change published to the site
 // shows up in the app immediately without reinstalling.
-const { app, BrowserWindow, shell, Menu, Tray, nativeImage, session, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, Menu, Tray, nativeImage, session, ipcMain, net } = require('electron');
 const path = require('path');
 
 const SITE_URL = 'https://shay-radio-il.netlify.app/';
@@ -92,6 +92,111 @@ function createTray() {
   });
   tray.on('double-click', showWindow);
 }
+
+// ----- Now-playing helpers for the site (window.electronAPI, see preload.js) -----
+// The site can't read song titles from other domains because of browser CORS
+// rules, so the app's main process fetches them instead. Only the radio site
+// itself may call these, only http(s) URLs are allowed, and every request has
+// a timeout and a size limit.
+
+const FETCH_TIMEOUT_MS = 10000;
+const MAX_TEXT_BYTES = 2 * 1024 * 1024;
+const MAX_ICY_BYTES = 600 * 1024;
+
+function assertFromSite(event) {
+  const frameUrl = event.senderFrame && event.senderFrame.url;
+  if (!frameUrl || !isInternal(frameUrl)) throw new Error('Not allowed');
+}
+
+function checkUrl(url) {
+  const u = new URL(String(url));
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('Only http(s) URLs are allowed');
+  return u.href;
+}
+
+async function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await net.fetch(url, { ...options, signal: controller.signal, cache: 'no-store' });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function readText(res, limit = MAX_TEXT_BYTES) {
+  const reader = res.body.getReader();
+  const chunks = [];
+  let total = 0;
+  while (total < limit) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    total += value.length;
+  }
+  reader.cancel().catch(() => {});
+  return Buffer.concat(chunks.map((c) => Buffer.from(c))).subarray(0, limit).toString('utf8');
+}
+
+function decodeEntities(str) {
+  return str
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&');
+}
+
+// Raw text of any URL (e.g. an XML/JSON now-playing feed).
+ipcMain.handle('radio:fetch', async (event, url) => {
+  assertFromSite(event);
+  const res = await fetchWithTimeout(checkUrl(url));
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return readText(res);
+});
+
+// Current song title from a SHOUTcast/Icecast stream's ICY metadata, or null.
+ipcMain.handle('radio:icyTitle', async (event, streamUrl) => {
+  assertFromSite(event);
+  const res = await fetchWithTimeout(checkUrl(streamUrl), { headers: { 'Icy-MetaData': '1' } });
+  const metaInt = parseInt(res.headers.get('icy-metaint'), 10);
+  if (!res.ok || !metaInt || !res.body) {
+    res.body && res.body.cancel().catch(() => {});
+    return null;
+  }
+  const reader = res.body.getReader();
+  let buf = Buffer.alloc(0);
+  try {
+    while (buf.length < MAX_ICY_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf = Buffer.concat([buf, Buffer.from(value)]);
+      if (buf.length > metaInt) {
+        const metaLen = buf[metaInt] * 16;
+        if (metaLen === 0) return null;
+        if (buf.length >= metaInt + 1 + metaLen) {
+          const meta = buf.subarray(metaInt + 1, metaInt + 1 + metaLen).toString('utf8').replace(/\0+$/, '');
+          const m = meta.match(/StreamTitle='([^']*)'/);
+          return m && m[1] ? m[1].trim() : null;
+        }
+      }
+    }
+    return null;
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+});
+
+// Now-playing text from a glz.co.il station page, or null.
+ipcMain.handle('radio:scrapeGlz', async (event, pageUrl) => {
+  assertFromSite(event);
+  const res = await fetchWithTimeout(checkUrl(pageUrl));
+  if (!res.ok) return null;
+  const html = await readText(res);
+  const m = html.match(/data-live-fallback="([^"]*)"/);
+  if (m && m[1]) return decodeEntities(m[1]).trim() || null;
+  return null;
+});
 
 ipcMain.on('radio-state', (_e, playing) => {
   isPlaying = Boolean(playing);

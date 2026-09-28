@@ -3,7 +3,7 @@
 //    not pause/stop the stream when the window is minimized or in the tray.
 // 2. Tracks the site's audio players so the tray menu can play/stop the
 //    stream and show whether it is playing.
-const { webFrame, ipcRenderer } = require('electron');
+const { webFrame, ipcRenderer, contextBridge } = require('electron');
 
 webFrame.executeJavaScript(`(${function keepPlaying() {
   const always = (value) => ({ configurable: true, get: () => value });
@@ -78,3 +78,11 @@ webFrame.executeJavaScript(`(${function keepPlaying() {
 
 window.addEventListener('shayradio-playing', () => ipcRenderer.send('radio-state', true));
 window.addEventListener('shayradio-stopped', () => ipcRenderer.send('radio-state', false));
+
+// Lets the site fetch now-playing info (song titles) without browser CORS
+// limits: the app's main process does the request (see electron/main.js).
+contextBridge.exposeInMainWorld('electronAPI', {
+  fetchRaw: (url) => ipcRenderer.invoke('radio:fetch', url),
+  icyTitle: (streamUrl) => ipcRenderer.invoke('radio:icyTitle', streamUrl),
+  scrapeGlz: (pageUrl) => ipcRenderer.invoke('radio:scrapeGlz', pageUrl),
+});
