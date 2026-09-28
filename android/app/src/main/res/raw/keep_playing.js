@@ -1,13 +1,15 @@
 // Injected into the site by ShayRadioPlugin, before the site's own scripts.
-// 1. The page always looks visible, so the player never stops the stream
-//    when the app goes to the background.
-// 2. Streams on plain http:// (e.g. ECO99FM) are tried over https:// first,
-//    falling back to http:// if the station doesn't support it.
-// 3. Tells the app when the radio plays/stops (and which station), and lets the
-//    notification's play / stop buttons drive the site's own player.
+//
+// On Android the radio is played by the app's native player (ExoPlayer) instead
+// of the WebView: it keeps playing in the background, plays every stream format
+// (e.g. ECO99FM) and reconnects by itself. This script routes the site's
+// <audio id="player"> to it, and reports the native player's state back to the
+// element so the site's display and buttons keep working as before.
 (function () {
   if (window.__shayRadio) return;
+  var N = window.ShayRadioNative;
 
+  // The page always looks visible, so it never pauses itself in the background.
   var always = function (value) { return { configurable: true, get: function () { return value; } }; };
   Object.defineProperty(Document.prototype, 'hidden', always(false));
   Object.defineProperty(Document.prototype, 'visibilityState', always('visible'));
@@ -20,92 +22,105 @@
     }, true);
   });
 
-  // --- http:// streams: try https:// first, fall back to the original. ---
-  var srcDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');
-  if (srcDesc && srcDesc.set) {
-    Object.defineProperty(HTMLMediaElement.prototype, 'src', {
+  if (!N) return; // not inside the Android app
+
+  // HLS stations (.m3u8) are played natively too: make the site hand the
+  // playlist URL to the player instead of using hls.js in the page.
+  var realHls;
+  try {
+    Object.defineProperty(window, 'Hls', {
       configurable: true,
-      enumerable: srcDesc.enumerable,
-      get: function () { return srcDesc.get.call(this); },
-      set: function (value) {
-        var v = String(value);
-        if (/^http:\/\//i.test(v)) {
-          this.__shayHttpFallback = v;
-          v = 'https://' + v.slice(7);
-        } else {
-          this.__shayHttpFallback = null;
-        }
-        srcDesc.set.call(this, v);
+      get: function () { return realHls; },
+      set: function (v) {
+        if (v) { try { v.isSupported = function () { return false; }; } catch (e) {} }
+        realHls = v;
       }
     });
-  }
-  document.addEventListener('error', function (e) {
-    var el = e.target;
-    if (!(el instanceof HTMLMediaElement) || !el.__shayHttpFallback) return;
-    var original = el.__shayHttpFallback;
-    el.__shayHttpFallback = null;
-    srcDesc.set.call(el, original);
-    el.play().catch(function () {});
-  }, true);
+  } catch (e) {}
 
-  // --- Tell the app whether the radio is playing. ---
-  var media = new Set();
-  var lastState = null, lastTitle = null;
+  var proto = HTMLMediaElement.prototype;
+  var srcDesc = Object.getOwnPropertyDescriptor(proto, 'src');
+  var volDesc = Object.getOwnPropertyDescriptor(proto, 'volume');
+  var origPlay = proto.play;
+  var origPause = proto.pause;
+
+  var el = null;          // the site's <audio id="player">
+  var nativePlaying = false;
+  var pending = null;     // promise returned by the last play()
+
+  function isMain(media) { return media && media.id === 'player'; }
+  function fire(type) { if (el) el.dispatchEvent(new Event(type)); }
   function stationName() {
-    var el = document.getElementById('vfdName');
-    return el ? (el.textContent || '').trim() : '';
+    var n = document.getElementById('vfdName');
+    return n ? (n.textContent || '').trim() : '';
   }
-  function isPlaying() {
-    var playing = false;
-    document.querySelectorAll('audio, video').forEach(function (el) { media.add(el); });
-    media.forEach(function (el) { if (!el.paused && !el.ended) playing = true; });
-    return playing;
-  }
-  function report() {
-    var playing = isPlaying();
-    var name = stationName();
-    if ((playing === lastState && name === lastTitle) || !window.ShayRadioNative) return;
-    lastState = playing;
-    lastTitle = name;
-    window.ShayRadioNative.setPlaying(playing, name);
-  }
-  function track(el) {
-    if (media.has(el)) return;
-    media.add(el);
-    ['play', 'playing', 'pause', 'ended', 'emptied'].forEach(function (t) { el.addEventListener(t, report); });
-  }
-  var originalPlay = HTMLMediaElement.prototype.play;
-  HTMLMediaElement.prototype.play = function () {
-    track(this);
-    setTimeout(report, 500);
-    return originalPlay.apply(this, arguments);
-  };
-  document.addEventListener('play', function (e) { track(e.target); report(); }, true);
-  document.addEventListener('pause', report, true);
-  setInterval(report, 3000);
 
-  // --- Play / stop from the notification, lock screen or headphones. ---
+  function adopt(media) {
+    if (el === media) return;
+    el = media;
+    Object.defineProperty(media, 'paused', { configurable: true, get: function () { return !nativePlaying; } });
+    Object.defineProperty(media, 'volume', {
+      configurable: true,
+      get: function () { return volDesc.get.call(media); },
+      set: function (v) { volDesc.set.call(media, v); try { N.setVolume(Number(v)); } catch (e) {} }
+    });
+  }
+
+  // Keep the stream URL for the native player; the WebView never loads it.
+  Object.defineProperty(proto, 'src', {
+    configurable: true,
+    enumerable: srcDesc.enumerable,
+    get: function () { return isMain(this) ? (this.__shayUrl || '') : srcDesc.get.call(this); },
+    set: function (v) {
+      if (isMain(this)) { adopt(this); this.__shayUrl = v ? new URL(String(v), location.href).href : ''; return; }
+      srcDesc.set.call(this, v);
+    }
+  });
+
+  proto.play = function () {
+    if (!isMain(this)) return origPlay.apply(this, arguments);
+    adopt(this);
+    var url = this.__shayUrl;
+    if (!url) return Promise.reject(new DOMException('No station selected', 'NotSupportedError'));
+    var p = {};
+    var promise = new Promise(function (resolve, reject) { p.resolve = resolve; p.reject = reject; });
+    promise.catch(function () {});
+    pending = p;
+    fire('play');
+    N.playStream(url, stationName(), Number(volDesc.get.call(this)));
+    return promise;
+  };
+
+  proto.pause = function () {
+    if (!isMain(this)) return origPause.apply(this, arguments);
+    N.stopStream();
+  };
+
+  // Called by the app when the native player's state changes.
   window.__shayRadio = {
-    play: function () {
-      // Re-tune the current station so it reconnects to the live broadcast.
-      if (typeof selectStation === 'function' && typeof currentIndex === 'number' && currentIndex >= 0) {
-        selectStation(currentIndex);
-        return true;
+    _native: function (state) {
+      if (state === 'playing') {
+        nativePlaying = true;
+        if (pending) { pending.resolve(); pending = null; }
+        fire('playing');
+      } else if (state === 'buffering') {
+        fire('waiting');
+        if (typeof setStatus === 'function' && !nativePlaying) setStatus('מתחבר...');
+      } else if (state === 'paused') {
+        var was = nativePlaying;
+        nativePlaying = false;
+        pending = null; // stopped while connecting: no error message
+        if (was) fire('pause');
+      } else if (state === 'error') {
+        nativePlaying = false;
+        if (pending) {
+          pending.reject(new DOMException('Stream failed', 'NotSupportedError'));
+          pending = null;
+        } else if (typeof setStatus === 'function') {
+          setStatus('שגיאת שידור — נסו תחנה אחרת.');
+        }
+        fire('pause');
       }
-      var btn = document.getElementById('playBtn');
-      if (btn) { btn.click(); return true; }
-      var el = document.querySelector('audio, video');
-      if (el) { el.play().catch(function () {}); return true; }
-      return false;
-    },
-    stop: function () {
-      var btn = document.getElementById('stopBtn');
-      if (btn) btn.click();
-      media.forEach(function (el) { if (!el.paused) el.pause(); });
-      return true;
-    },
-    toggle: function () {
-      return isPlaying() ? this.stop() : this.play();
     }
   };
 })();

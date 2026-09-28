@@ -43,9 +43,9 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
-        // The player notification is always there while the app is open; starting
+        // The player (and its notification) runs while the app is open; starting
         // it here (app in the foreground) is what Android requires.
-        RadioService.update(this, RadioService.playing, RadioService.title, true);
+        RadioService.ensureStarted(this);
     }
 
     @Override
@@ -62,8 +62,9 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
-        RadioService.stop(this);
-        RadioService.playing = false;
+        // Only when the app is really closed; Android may also recreate this
+        // screen in the background, and the radio should keep playing then.
+        if (isFinishing()) RadioService.stop(this);
         super.onDestroy();
     }
 

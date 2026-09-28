@@ -9,7 +9,6 @@ import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.webkit.JavascriptInterface;
-import android.webkit.WebSettings;
 import android.webkit.WebView;
 import androidx.lifecycle.Lifecycle;
 import androidx.webkit.WebViewCompat;
@@ -21,13 +20,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import org.json.JSONObject;
 
 /**
- * Connects the site's radio player to Android. Capacitor loads plugins before
- * it loads the site, so everything here is in place before the page runs.
+ * Connects the site's radio player to the native player (RadioService).
+ * Capacitor loads plugins before it loads the site, so the bridge and the
+ * page script are in place before the page runs.
  */
 @CapacitorPlugin(name = "ShayRadio")
-public class ShayRadioPlugin extends Plugin implements RadioService.Controller {
+public class ShayRadioPlugin extends Plugin implements RadioService.Listener {
 
     private String script = "";
 
@@ -37,16 +38,7 @@ public class ShayRadioPlugin extends Plugin implements RadioService.Controller {
         WebView webView = getBridge().getWebView();
         script = readScript();
 
-        // Allow the few stations that still stream over plain http (e.g. ECO99FM).
-        webView.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        // Keep the page's audio at full priority while the app is in the background.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
-        }
-
         webView.addJavascriptInterface(new NativeBridge(), "ShayRadioNative");
-        // Fetch problem streams (e.g. ECO99FM) natively; see StreamFixClient.
-        getBridge().setWebViewClient(new StreamFixClient(getBridge()));
 
         // Run our script before the site's own scripts on every page load...
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
@@ -64,48 +56,55 @@ public class ShayRadioPlugin extends Plugin implements RadioService.Controller {
             }
         });
 
-        RadioService.controller = this;
+        RadioService.listener = this;
     }
 
     @Override
     protected void handleOnDestroy() {
-        if (RadioService.controller == this) RadioService.controller = null;
+        if (RadioService.listener == this) RadioService.listener = null;
         super.handleOnDestroy();
     }
 
-    // ----- Commands from the notification / lock screen / headphones -----
+    // ----- Native player -> page -----
 
     @Override
-    public void play() {
-        runJs("window.__shayRadio && window.__shayRadio.play()");
-    }
-
-    @Override
-    public void stop() {
-        runJs("window.__shayRadio && window.__shayRadio.stop()");
+    public void onState(String state) {
+        String js = "window.__shayRadio && window.__shayRadio._native(" + JSONObject.quote(state) + ")";
+        if (getActivity() == null) return;
+        getActivity().runOnUiThread(() -> getBridge().getWebView().evaluateJavascript(js, null));
     }
 
     @Override
     public void exit() {
-        stop();
+        if (getActivity() == null) return;
         getActivity().runOnUiThread(() -> getActivity().finishAndRemoveTask());
     }
 
-    private void runJs(String js) {
-        getActivity().runOnUiThread(() -> getBridge().getWebView().evaluateJavascript(js, null));
-    }
+    // ----- Page -> native player -----
 
-    // ----- Messages from the page -----
+    private boolean appInForeground() {
+        return getActivity().getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED);
+    }
 
     private class NativeBridge {
         @JavascriptInterface
-        public void setPlaying(boolean isPlaying, String stationName) {
+        public void playStream(String url, String title, double volume) {
             getActivity().runOnUiThread(() -> {
-                boolean inForeground = getActivity().getLifecycle().getCurrentState()
-                    .isAtLeast(Lifecycle.State.STARTED);
-                RadioService.update(getContext(), isPlaying, stationName, inForeground);
-                if (isPlaying && inForeground) askToIgnoreBatteryOptimizationOnce();
+                boolean foreground = appInForeground();
+                RadioService.setVolume((float) volume);
+                RadioService.playStream(getContext(), url, title, foreground);
+                if (foreground) askToIgnoreBatteryOptimizationOnce();
             });
+        }
+
+        @JavascriptInterface
+        public void stopStream() {
+            RadioService.stopStream();
+        }
+
+        @JavascriptInterface
+        public void setVolume(double volume) {
+            RadioService.setVolume((float) volume);
         }
     }
 
