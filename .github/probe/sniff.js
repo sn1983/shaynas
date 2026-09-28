@@ -1,25 +1,15 @@
 // Temporary: visit each station's website and log API responses that look like "now playing" data.
 const { chromium } = require('playwright');
 const SITES = {
-  'kan':        ['https://www.kan.org.il/radio/', 'https://www.kan.org.il/content/kan/kan-88/'],
-  '103fm':      ['https://103fm.maariv.co.il/'],
-  '100fm':      ['https://100fm.co.il/'],
-  '102fm':      ['https://102fm.co.il/'],
-  'eco99':      ['https://eco99fm.maariv.co.il/'],
-  '101fm':      ['https://101fm.co.il/'],
-  'darom97':    ['https://www.darom97.co.il/', 'https://97fm.co.il/'],
-  'darom1015':  ['https://1015.co.il/'],
-  'galeyisrael':['https://www.gly.co.il/'],
-  'kolrega':    ['https://www.kolrega.co.il/'],
-  'kolchai':    ['https://93fm.co.il/'],
-  'kolbarama':  ['https://www.kol-barama.co.il/'],
-  'haifa':      ['https://www.radiohaifa.co.il/'],
-  'levhamedina':['https://91fm.co.il/'],
-  'tzafon':     ['https://1045fm.co.il/'],
-  '891':        ['https://891fm.co.il/'],
-  'hatahana':   ['https://www.hatahana.co.il/'],
-  'ashams':     ['https://www.ashams.com/'],
-  'nahariya':   ['https://radionahariya.com/'],
+  'eco99-live': ['https://eco99fm.maariv.co.il/live-radio'],
+  '103fm-live': ['https://103fm.maariv.co.il/live'],
+  '100fm':      ['https://www.100fm.co.il/'],
+  'darom':      ['https://www.radiodarom.co.il/'],
+  'haifa':      ['https://1075.fm/'],
+  'tzafon':     ['https://www.1045.co.il/', 'https://www.radio1045.co.il/'],
+  'levhamedina':['https://www.91fm.co.il/'],
+  'jerusalem':  ['https://www.101fm.co.il/'],
+  'hatahana':   ['https://www.hatahana.co.il/live/'],
 };
 const INTERESTING = /(artist|song|track|title|now.?playing|current|onair|playlist|singer|performer)/i;
 (async () => {
@@ -71,13 +61,24 @@ const INTERESTING = /(artist|song|track|title|now.?playing|current|onair|playlis
       await ctx.close();
     }
   }
-  // Triton: try other mount names / no event filter for Kan
-  for (const mount of ['KAN_88', 'KAN_88AAC', 'KAN_GIMMEL', 'KAN_GIMMELAAC', 'KAN_BET', 'KAN_TARBUT']) {
-    for (const q of ['&numberToFetch=3', '&numberToFetch=3&eventType=track']) {
-      const u = `https://np.tritondigital.com/public/nowplaying?mountName=${mount}${q}`;
-      const t = await (await fetch(u)).text().catch(() => 'ERR');
-      console.log('triton', mount, q, t.slice(0, 250).replace(/\s+/g, ' '));
-    }
+  // Kan: find the channelId of every station
+  for (let id = 1; id <= 40; id++) {
+    try {
+      const r = await fetch('https://www.kan.org.il/api/arc-cloud/get-live-track-data?channelId=' + id, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      const t = await r.text();
+      console.log('kan channel', id, r.status, t.slice(0, 260).replace(/\s+/g, ' '));
+    } catch (e) { console.log('kan channel', id, 'ERR', e.message); }
   }
+  // Kan page: map of channel ids to station names
+  try {
+    const html = await (await fetch('https://www.kan.org.il/radio/', { headers: { 'User-Agent': 'Mozilla/5.0' } })).text();
+    const ids = html.match(/.{0,200}data-channel-id=["']?\d+.{0,200}/g) || [];
+    ids.slice(0, 40).forEach((m) => console.log('kan html:', m.replace(/\s+/g, ' ')));
+  } catch (e) { console.log('kan html ERR', e.message); }
+  // 91fm player script: how it gets the track name
+  try {
+    const js = await (await fetch('https://www.91fm.co.il/wp-content/themes/91fm/js/beetle-radio.js?ver=4')).text();
+    (js.match(/.{0,200}(https?:\/\/|ajax|getJSON|\.get\(|fetch\(|trackname|\.json|\.xml|stats|currentsong|7\.html).{0,200}/gi) || []).slice(0, 25).forEach((m) => console.log('91fm js:', m.replace(/\s+/g, ' ')));
+  } catch (e) { console.log('91fm js ERR', e.message); }
   await browser.close();
 })();
