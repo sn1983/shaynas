@@ -45,7 +45,7 @@ public class MainActivity extends BridgeActivity {
         super.onResume();
         // The player notification is always there while the app is open; starting
         // it here (app in the foreground) is what Android requires.
-        RadioService.update(this, ShayRadioPlugin.playing, ShayRadioPlugin.title);
+        RadioService.update(this, RadioService.playing, RadioService.title, true);
     }
 
     @Override
@@ -63,7 +63,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         RadioService.stop(this);
-        ShayRadioPlugin.playing = false;
+        RadioService.playing = false;
         super.onDestroy();
     }
 

@@ -11,6 +11,7 @@ import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import androidx.lifecycle.Lifecycle;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 import com.getcapacitor.Plugin;
@@ -28,9 +29,6 @@ import java.util.Collections;
 @CapacitorPlugin(name = "ShayRadio")
 public class ShayRadioPlugin extends Plugin implements RadioService.Controller {
 
-    static volatile boolean playing = false;
-    static volatile String title = "";
-
     private String script = "";
 
     @SuppressLint({ "JavascriptInterface", "AddJavascriptInterface" })
@@ -47,6 +45,8 @@ public class ShayRadioPlugin extends Plugin implements RadioService.Controller {
         }
 
         webView.addJavascriptInterface(new NativeBridge(), "ShayRadioNative");
+        // Fetch problem streams (e.g. ECO99FM) natively; see StreamFixClient.
+        getBridge().setWebViewClient(new StreamFixClient(getBridge()));
 
         // Run our script before the site's own scripts on every page load...
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
@@ -100,11 +100,12 @@ public class ShayRadioPlugin extends Plugin implements RadioService.Controller {
     private class NativeBridge {
         @JavascriptInterface
         public void setPlaying(boolean isPlaying, String stationName) {
-            playing = isPlaying;
-            title = stationName != null ? stationName : "";
-            Context ctx = getContext();
-            RadioService.update(ctx, playing, title);
-            if (isPlaying) getActivity().runOnUiThread(ShayRadioPlugin.this::askToIgnoreBatteryOptimizationOnce);
+            getActivity().runOnUiThread(() -> {
+                boolean inForeground = getActivity().getLifecycle().getCurrentState()
+                    .isAtLeast(Lifecycle.State.STARTED);
+                RadioService.update(getContext(), isPlaying, stationName, inForeground);
+                if (isPlaying && inForeground) askToIgnoreBatteryOptimizationOnce();
+            });
         }
     }
 

@@ -11,6 +11,8 @@ import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.support.v4.media.MediaMetadataCompat;
@@ -40,26 +42,37 @@ public class RadioService extends Service {
     static final String ACTION_PLAY = "il.shayradio.app.PLAY";
     static final String ACTION_STOP = "il.shayradio.app.STOP";
     static final String ACTION_EXIT = "il.shayradio.app.EXIT";
-    static final String EXTRA_PLAYING = "playing";
-    static final String EXTRA_TITLE = "title";
 
     private static final String CHANNEL_ID = "radio_playback";
     private static final int NOTIFICATION_ID = 1;
 
     static volatile Controller controller;
 
+    // Current state, shared with the rest of the app (same process).
+    static volatile boolean playing = false;
+    static volatile String title = "";
+    private static volatile RadioService instance;
+    private static final Handler mainHandler = new Handler(Looper.getMainLooper());
+
     private MediaSessionCompat session;
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
-    private boolean playing;
-    private String title = "";
 
-    /** Start (or update) the service. Call while the app is in the foreground. */
-    static void update(Context context, boolean playing, String title) {
-        Intent intent = new Intent(context, RadioService.class)
-            .setAction(ACTION_UPDATE)
-            .putExtra(EXTRA_PLAYING, playing)
-            .putExtra(EXTRA_TITLE, title);
+    /**
+     * Update the player notification. If the service isn't running yet it is
+     * started, but only when {@code appInForeground} is true: Android does not
+     * allow starting it from the background (doing so can crash the app).
+     */
+    static void update(Context context, boolean isPlaying, String stationTitle, boolean appInForeground) {
+        playing = isPlaying;
+        if (stationTitle != null) title = stationTitle;
+        RadioService running = instance;
+        if (running != null) {
+            mainHandler.post(running::refresh);
+            return;
+        }
+        if (!appInForeground) return;
+        Intent intent = new Intent(context, RadioService.class).setAction(ACTION_UPDATE);
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent);
@@ -79,6 +92,7 @@ public class RadioService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        instance = this;
         createChannel();
         session = new MediaSessionCompat(this, "ShayRadio");
         session.setCallback(new MediaSessionCompat.Callback() {
@@ -94,24 +108,27 @@ public class RadioService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // Always become a foreground service right away (Android requires it).
+        refresh();
         String action = intent != null ? intent.getAction() : null;
-        if (ACTION_UPDATE.equals(action)) {
-            playing = intent.getBooleanExtra(EXTRA_PLAYING, false);
-            String t = intent.getStringExtra(EXTRA_TITLE);
-            if (t != null) title = t;
-        } else if (ACTION_PLAY.equals(action) || ACTION_STOP.equals(action) || ACTION_EXIT.equals(action)) {
+        if (ACTION_PLAY.equals(action) || ACTION_STOP.equals(action) || ACTION_EXIT.equals(action)) {
             runController(action);
             // Show the new state right away; the page confirms it a moment later.
             if (ACTION_PLAY.equals(action)) playing = true;
             if (ACTION_STOP.equals(action)) playing = false;
             if (ACTION_EXIT.equals(action)) {
+                playing = false;
                 stopSelf();
                 return START_NOT_STICKY;
             }
+            refresh();
         }
+        return START_NOT_STICKY;
+    }
+
+    private void refresh() {
         showNotification();
         updateLocks();
-        return START_NOT_STICKY;
     }
 
     private void runController(String action) {
@@ -227,6 +244,7 @@ public class RadioService extends Service {
 
     @Override
     public void onDestroy() {
+        if (instance == this) instance = null;
         releaseLocks();
         if (session != null) {
             session.setActive(false);
