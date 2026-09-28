@@ -2,37 +2,14 @@ name: Probe now-playing (temporary)
 on:
   push:
     branches: [claude/electron-shay-radio-app-8klop2]
-    paths: [.github/workflows/probe.yml]
+    paths: [.github/workflows/probe.yml, .github/probe/**]
 jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          set +e
-          UA='Mozilla/5.0 (RadioApp)'
-          echo "=== 1. live site uses electronAPI?"
-          curl -sS https://shay-radio-il.netlify.app/ | grep -c electronAPI
-          echo "=== 2. triton KAN_88"
-          curl -sS -m 10 -A "$UA" -D - 'https://np.tritondigital.com/public/nowplaying?mountName=KAN_88&numberToFetch=1&eventType=track' | head -c 1500; echo
-          echo "=== 3. ICY headers"
-          for u in https://cdn.cybercdn.live/103FM/Live/icecast.audio https://cdn.cybercdn.live/Radios_100FM/Audio/icecast.audio https://29073.live.streamtheworld.com/KAN_88.mp3; do
-            echo "--- $u"
-            curl -sS -m 5 -A "$UA" -H 'Icy-MetaData: 1' -D - -o ic.bin "$u" | grep -iE '^(HTTP|icy-metaint|content-type)'
-            python3 - <<'PY'
-          import re
-          d=open('ic.bin','rb').read()
-          m=re.search(rb"StreamTitle='([^']*)'", d)
-          print('StreamTitle in first bytes:', m.group(1).decode('utf8','replace') if m else None)
-          PY
-          done
-          echo "=== 4. glz page"
-          curl -sSL -m 15 -A 'Mozilla/5.0' 'https://glz.co.il/%D7%92%D7%9C%D7%92%D7%9C%D7%A6/' -o glz.html; wc -c glz.html
-          grep -oE 'data-live-fallback="[^"]*"' glz.html | head -3
-          grep -oE '(x-data|x-init)="[^"]{0,300}' glz.html | head -10
-          grep -oiE '(https?:)?//[^"'"'"' ]*(api|xml|json|nowplaying|playlist|song|live)[^"'"'"' ]*' glz.html | sort -u | head -40
-          for s in $(grep -oE 'src="[^"]+\.js[^"]*"' glz.html | sed 's/src="//;s/"$//' | head -15); do
-            case "$s" in http*) u="$s";; //*) u="https:$s";; /*) u="https://glz.co.il$s";; *) u="https://glz.co.il/$s";; esac
-            curl -sSL -m 10 "$u" -o f.js
-            hits=$(grep -oiE '.{0,120}(fetch\(|axios|\.get\(|XMLHttpRequest|api/|\.xml|songs?|nowplaying|onair|live-fallback).{0,160}' f.js | head -8)
-            [ -n "$hits" ] && { echo "--- $u"; echo "$hits"; }
-          done
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: xvfb-run -a npx electron --no-sandbox .github/probe/e2e.js 2>&1 | grep -v -iE 'dbus|gpu|viz|vaapi|libva' | head -150
+        timeout-minutes: 3
