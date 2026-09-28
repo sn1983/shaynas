@@ -106,6 +106,49 @@ public class ShayRadioPlugin extends Plugin implements RadioService.Listener {
         public void setVolume(double volume) {
             RadioService.setVolume((float) volume);
         }
+
+        // ----- Now-playing helpers (window.electronAPI on the page) -----
+
+        @JavascriptInterface
+        public void fetchRaw(String id, String url) {
+            ifFromSite(id, () -> NowPlaying.fetchRaw(url, result -> deliver(id, result)));
+        }
+
+        @JavascriptInterface
+        public void icyTitle(String id, String url) {
+            ifFromSite(id, () -> NowPlaying.icyTitle(url, result -> deliver(id, result)));
+        }
+
+        @JavascriptInterface
+        public void scrapeGlz(String id, String url) {
+            ifFromSite(id, () -> NowPlaying.scrapeGlz(getContext(), url, result -> deliver(id, result)));
+        }
+    }
+
+    private static final String SITE_ORIGIN = "https://shay-radio-il.netlify.app";
+
+    /** Only serve requests while the radio site itself is the loaded page. */
+    private void ifFromSite(String id, Runnable action) {
+        if (getActivity() == null) return;
+        getActivity().runOnUiThread(() -> {
+            String pageUrl = getBridge().getWebView().getUrl();
+            if (pageUrl != null && (pageUrl.equals(SITE_ORIGIN) || pageUrl.startsWith(SITE_ORIGIN + "/"))) {
+                action.run();
+            } else {
+                deliver(id, null);
+            }
+        });
+    }
+
+    /** Send a helper's result back to the page (window.__shayNP resolves the promise). */
+    private void deliver(String id, Object result) {
+        String json;
+        if (result == null) json = "null";
+        else if (result instanceof JSONObject) json = result.toString();
+        else json = JSONObject.quote(String.valueOf(result));
+        String js = "window.__shayNP && window.__shayNP(" + JSONObject.quote(id) + "," + json + ")";
+        if (getActivity() == null) return;
+        getActivity().runOnUiThread(() -> getBridge().getWebView().evaluateJavascript(js, null));
     }
 
     /**

@@ -24,6 +24,29 @@
 
   if (!N) return; // not inside the Android app
 
+  // Now-playing helpers, same API as the Windows app's window.electronAPI
+  // (see NowPlaying.java): the app does the requests, so CORS doesn't apply.
+  var npCalls = {}, npSeq = 0;
+  window.__shayNP = function (id, result) {
+    var done = npCalls[id];
+    if (!done) return;
+    delete npCalls[id];
+    done(result);
+  };
+  function npCall(method, url, fallback) {
+    return new Promise(function (resolve) {
+      var id = String(++npSeq);
+      var timer = setTimeout(function () { window.__shayNP(id, fallback); }, 20000);
+      npCalls[id] = function (result) { clearTimeout(timer); resolve(result); };
+      try { N[method](id, String(url)); } catch (e) { window.__shayNP(id, fallback); }
+    });
+  }
+  window.electronAPI = {
+    fetchRaw: function (url) { return npCall('fetchRaw', url, { ok: false, status: 0, text: '', error: 'failed' }); },
+    icyTitle: function (streamUrl) { return npCall('icyTitle', streamUrl, null); },
+    scrapeGlz: function (pageUrl) { return npCall('scrapeGlz', pageUrl, null); }
+  };
+
   // HLS stations (.m3u8) are played natively too: make the site hand the
   // playlist URL to the player instead of using hls.js in the page.
   var realHls;
