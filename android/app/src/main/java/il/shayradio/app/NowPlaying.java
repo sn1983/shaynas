@@ -29,7 +29,7 @@ import org.json.JSONObject;
  *
  *   fetchRaw(url)   -> { ok, status, text }
  *   icyTitle(url)   -> String or null   (ICY StreamTitle of an Icecast/SHOUTcast stream)
- *   scrapeGlz(url)  -> String or null   (glz.co.il value, read after the page's own JS ran)
+ *   scrapeGlz(url)  -> String or null   (glz.co.il current song, or the program during talk)
  */
 final class NowPlaying {
 
@@ -115,6 +115,12 @@ final class NowPlaying {
 
     // ---- ICY StreamTitle reader ----
     private static final Pattern STREAM_TITLE = Pattern.compile("StreamTitle='([^']*)'");
+    private static final Pattern JUNK_TITLE = Pattern.compile("(?i)powered by|^cdn\\b|^[\\s\\-–]*$");
+
+    /** Titles some stream providers send instead of the song (e.g. "CDN - Powered By ..."). */
+    private static boolean isJunkTitle(String title) {
+        return JUNK_TITLE.matcher(title).find();
+    }
 
     static void icyTitle(String url, Callback cb) {
         pool.execute(() -> {
@@ -134,15 +140,24 @@ final class NowPlaying {
                     // no ICY metadata on this stream
                 }
                 if (metaInt > 0 && metaInt < MAX_ICY_BYTES) {
+                    // Metadata blocks repeat every metaInt audio bytes; the first ones may
+                    // be empty, so keep scanning until a real title shows up.
                     InputStream in = conn.getInputStream();
-                    readFully(in, metaInt); // skip the audio before the first metadata block
-                    int lenByte = in.read();
-                    int metaLen = lenByte > 0 ? lenByte * 16 : 0;
-                    if (metaLen > 0) {
-                        byte[] meta = readFully(in, metaLen);
-                        String metaStr = new String(meta, StandardCharsets.UTF_8).replaceAll("\u0000+$", "");
+                    int read = 0;
+                    while (title == null && read < MAX_ICY_BYTES) {
+                        readFully(in, metaInt); // audio before the next metadata block
+                        int lenByte = in.read();
+                        if (lenByte < 0) break;
+                        int metaLen = lenByte * 16;
+                        read += metaInt + 1 + metaLen;
+                        if (metaLen == 0) continue;
+                        String metaStr = new String(readFully(in, metaLen), StandardCharsets.UTF_8)
+                            .replaceAll("\u0000+$", "");
                         Matcher m = STREAM_TITLE.matcher(metaStr);
-                        if (m.find() && !m.group(1).isEmpty()) title = m.group(1);
+                        if (m.find()) {
+                            String t = m.group(1).trim();
+                            if (!t.isEmpty() && !isJunkTitle(t)) title = t;
+                        }
                     }
                 }
             } catch (Exception ignored) {
@@ -166,9 +181,17 @@ final class NowPlaying {
     }
 
     // ---- glz.co.il: hidden WebView that runs the page's own JS ----
+    // In .playLiveText the page shows the program (.title) and the current song
+    // (.talent = "artist - title"), filled in by the page's own JS.
     private static final String GLZ_SCRIPT =
-        "(function(){var el=document.querySelector('[data-live-fallback]');"
-            + "var v=el?el.getAttribute('data-live-fallback'):null;return v&&v.trim()?v:null;})()";
+        "(function(){var box=document.querySelector('.playLiveText')||document;"
+            + "function read(s){var el=box.querySelector(s);if(!el)return '';"
+            + "return (el.textContent||'').trim()||(el.getAttribute('data-live-fallback')||'').trim();}"
+            + "return JSON.stringify({song:read('.talent'),program:read('.title')});})()";
+
+    private static String emptyToNull(String s) {
+        return s == null || s.trim().isEmpty() ? null : s.trim();
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     static void scrapeGlz(Context context, String url, Callback cb) {
@@ -201,23 +224,28 @@ final class NowPlaying {
             // The page fills the value in after load; check every 500 ms for up to ~10 s.
             final int[] attempts = { 0 };
             final boolean[] finished = { false };
+            final String[] lastProgram = { null };
             Runnable[] poll = new Runnable[1];
             poll[0] = () -> {
                 if (finished[0]) return;
                 web.evaluateJavascript(GLZ_SCRIPT, value -> {
                     if (finished[0]) return;
-                    String result = null;
+                    String song = null;
                     try {
-                        Object v = new JSONArray("[" + value + "]").get(0);
-                        if (v instanceof String && !((String) v).trim().isEmpty()) result = (String) v;
+                        // value is a JSON string literal holding our JSON object
+                        JSONObject found = new JSONObject(new JSONArray("[" + value + "]").getString(0));
+                        song = emptyToNull(found.optString("song"));
+                        String program = emptyToNull(found.optString("program"));
+                        if (program != null) lastProgram[0] = program;
                     } catch (Exception ignored) {
-                        // not ready yet
+                        // page not ready yet
                     }
-                    if (result != null || ++attempts[0] >= 20) {
+                    // Prefer the song; during talk segments fall back to the program name.
+                    if (song != null || ++attempts[0] >= 20) {
                         finished[0] = true;
                         web.stopLoading();
                         web.destroy();
-                        cb.done(result);
+                        cb.done(song != null ? song : lastProgram[0]);
                     } else {
                         main.postDelayed(poll[0], 500);
                     }

@@ -5,8 +5,9 @@
  *
  *   radio:fetch      -> { ok, status, text }   raw text of a URL (Triton/Kan XML, APIs)
  *   radio:icyTitle   -> string | null          ICY StreamTitle of an Icecast/SHOUTcast stream
- *   radio:scrapeGlz  -> string | null          glz.co.il "now playing" (rendered by the page's
- *                                               own JS, so it is read from a hidden window)
+ *   radio:scrapeGlz  -> string | null          glz.co.il current song ("artist - title"), or the
+ *                                               program name during talk; read from a hidden window
+ *                                               after the page's own JS has filled it in
  *
  * Safety: only the radio site's own pages may call these, only http(s) URLs
  * are fetched, and every request has a timeout and a size limit.
@@ -102,6 +103,11 @@ ipcMain.handle('radio:fetch', async (event, url) => {
   return fetchRaw(url);
 });
 
+// Titles some stream providers send instead of the song (e.g. "CDN - Powered By ...").
+function isJunkTitle(title) {
+  return /powered by|^cdn\b|^[\s\-–]*$/i.test(title);
+}
+
 // ---- ICY StreamTitle reader (reads icy-metaint from the raw headers) --------
 ipcMain.handle('radio:icyTitle', async (event, streamUrl) => {
   assertFromSite(event);
@@ -122,20 +128,22 @@ ipcMain.handle('radio:icyTitle', async (event, streamUrl) => {
     req.on('response', (res) => {
       const metaInt = parseInt(res.headers['icy-metaint'], 10);
       if (!metaInt) return done(null);
+      // Metadata blocks repeat every metaInt audio bytes; the first ones may be
+      // empty, so keep scanning until a real title shows up (or the size cap).
       let buffer = Buffer.alloc(0);
+      let pos = metaInt; // position of the next metadata length byte
       res.on('data', (chunk) => {
         buffer = Buffer.concat([buffer, chunk]);
-        if (buffer.length > metaInt) {
-          const metaLen = buffer[metaInt] * 16;
-          if (metaLen === 0) return done(null);
-          if (buffer.length >= metaInt + 1 + metaLen) {
-            const metaStr = buffer
-              .subarray(metaInt + 1, metaInt + 1 + metaLen)
-              .toString('utf8')
-              .replace(/\0+$/, '');
+        while (buffer.length > pos) {
+          const metaLen = buffer[pos] * 16;
+          if (buffer.length < pos + 1 + metaLen) break; // wait for the rest of the block
+          if (metaLen > 0) {
+            const metaStr = buffer.subarray(pos + 1, pos + 1 + metaLen).toString('utf8').replace(/\0+$/, '');
             const m = metaStr.match(/StreamTitle='([^']*)'/);
-            return done(m && m[1] ? m[1] : null);
+            const title = m && m[1] ? m[1].trim() : '';
+            if (title && !isJunkTitle(title)) return done(title);
           }
+          pos += 1 + metaLen + metaInt;
         }
         if (buffer.length > MAX_ICY_BYTES) done(null);
       });
@@ -145,6 +153,18 @@ ipcMain.handle('radio:icyTitle', async (event, streamUrl) => {
     req.setTimeout(8000, () => done(null));
   });
 });
+
+const GLZ_SCRIPT = `
+  (function () {
+    const box = document.querySelector('.playLiveText') || document;
+    const read = (sel) => {
+      const el = box.querySelector(sel);
+      if (!el) return '';
+      return ((el.textContent || '').trim() || (el.getAttribute('data-live-fallback') || '').trim());
+    };
+    return { song: read('.talent') || null, program: read('.title') || null };
+  })();
+`;
 
 // ---- glz.co.il scraper: hidden, muted window that runs the page's own JS ----
 ipcMain.handle('radio:scrapeGlz', async (event, pageUrl) => {
@@ -166,19 +186,17 @@ ipcMain.handle('radio:scrapeGlz', async (event, pageUrl) => {
     win.webContents.setAudioMuted(true);
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     await win.loadURL(u.href);
-    // The page fills the value in after load (Alpine.js); wait for it, up to ~8s.
+    // In .playLiveText the page shows the program (.title) and the current song
+    // (.talent = "artist - title"), filled in by the page's own JS (Alpine.js).
+    // Prefer the song; during talk segments there is none, so fall back to the program.
+    let program = null;
     for (let i = 0; i < 16; i++) {
-      const value = await win.webContents.executeJavaScript(`
-        (function () {
-          const el = document.querySelector('[data-live-fallback]');
-          const v = el ? el.getAttribute('data-live-fallback') : null;
-          return v && v.trim() ? v : null;
-        })();
-      `);
-      if (value) return value;
+      const found = await win.webContents.executeJavaScript(GLZ_SCRIPT);
+      if (found && found.song) return found.song;
+      if (found && found.program) program = found.program;
       await new Promise((r) => setTimeout(r, 500));
     }
-    return null;
+    return program;
   } catch {
     return null;
   } finally {
