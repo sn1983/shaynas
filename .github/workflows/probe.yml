@@ -1,0 +1,23 @@
+name: Probe site (temporary)
+on:
+  push:
+    branches: [claude/electron-shay-radio-app-8klop2]
+    paths: [.github/workflows/probe.yml]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set +e
+          U=https://shay-radio-il.netlify.app/
+          curl -sSL "$U" -o index.html
+          echo "=== index.html ($(wc -c < index.html) bytes)"; cat index.html | head -c 6000; echo
+          for s in $(grep -oE '(src|href)="[^"]+\.(js|json|m3u8?|pls)[^"]*"' index.html | sed -E 's/^(src|href)="//; s/"$//'); do
+            case "$s" in http*) url="$s";; /*) url="https://shay-radio-il.netlify.app$s";; *) url="$U$s";; esac
+            echo "=== $url"; curl -sSL "$url" -o f; wc -c < f
+            grep -oE '(https?:)?//[^"'"'"' )`]+' f | grep -viE 'fonts|w3.org|reactjs|github' | sort -u | head -200
+            grep -oiE '.{200}eco.?99.{400}' f | head -5
+            grep -oiE '.{0,80}(hls|m3u8|audio\.|new Audio|\.play\(\)|\.pause\(\)).{0,120}' f | head -40
+          done
+          echo "=== eco in html"; grep -oiE '.{200}eco.?99.{400}' index.html | head -5
+          echo "=== urls in html"; grep -oE 'https?://[^"'"'"' )<]+' index.html | sort -u | head -200
