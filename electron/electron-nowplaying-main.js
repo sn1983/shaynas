@@ -108,6 +108,22 @@ function isJunkTitle(title) {
   return /powered by|^cdn\b|^[\s\-–]*$/i.test(title);
 }
 
+// Hebrew titles often arrive in the old Windows-1255 encoding, either as raw
+// bytes (not valid UTF-8) or already mangled into Latin-1 letters ("ùéø" for
+// "שיר"). Turn both back into proper Hebrew.
+function decodeTitleBytes(bytes) {
+  let text;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return new TextDecoder('windows-1255').decode(bytes);
+  }
+  if (/^[\u0000-\u00ff]*$/.test(text) && /[\u00e0-\u00fa]{2,}/.test(text)) {
+    return new TextDecoder('windows-1255').decode(Buffer.from(text, 'latin1'));
+  }
+  return text;
+}
+
 // ---- ICY StreamTitle reader (reads icy-metaint from the raw headers) --------
 ipcMain.handle('radio:icyTitle', async (event, streamUrl) => {
   assertFromSite(event);
@@ -138,7 +154,7 @@ ipcMain.handle('radio:icyTitle', async (event, streamUrl) => {
           const metaLen = buffer[pos] * 16;
           if (buffer.length < pos + 1 + metaLen) break; // wait for the rest of the block
           if (metaLen > 0) {
-            const metaStr = buffer.subarray(pos + 1, pos + 1 + metaLen).toString('utf8').replace(/\0+$/, '');
+            const metaStr = decodeTitleBytes(buffer.subarray(pos + 1, pos + 1 + metaLen)).replace(/\0+$/, '');
             const m = metaStr.match(/StreamTitle='([^']*)'/);
             const title = m && m[1] ? m[1].trim() : '';
             if (title && !isJunkTitle(title)) return done(title);

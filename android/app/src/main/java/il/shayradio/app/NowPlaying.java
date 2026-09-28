@@ -12,6 +12,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
@@ -117,6 +121,31 @@ final class NowPlaying {
     private static final Pattern STREAM_TITLE = Pattern.compile("StreamTitle='([^']*)'");
     private static final Pattern JUNK_TITLE = Pattern.compile("(?i)powered by|^cdn\\b|^[\\s\\-–]*$");
 
+    private static final Charset WINDOWS_1255 = Charset.forName("windows-1255");
+    private static final Pattern LATIN1_ONLY = Pattern.compile("^[\\u0000-\\u00ff]*$");
+    private static final Pattern MANGLED_HEBREW = Pattern.compile("[\\u00e0-\\u00fa]{2,}");
+
+    /**
+     * Hebrew titles often arrive in the old Windows-1255 encoding, either as raw
+     * bytes (not valid UTF-8) or already mangled into Latin-1 letters ("ùéø" for
+     * "שיר"). Turn both back into proper Hebrew.
+     */
+    private static String decodeTitleBytes(byte[] bytes) {
+        String text;
+        try {
+            text = StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes)).toString();
+        } catch (CharacterCodingException e) {
+            return new String(bytes, WINDOWS_1255);
+        }
+        if (LATIN1_ONLY.matcher(text).matches() && MANGLED_HEBREW.matcher(text).find()) {
+            return new String(text.getBytes(StandardCharsets.ISO_8859_1), WINDOWS_1255);
+        }
+        return text;
+    }
+
     /** Titles some stream providers send instead of the song (e.g. "CDN - Powered By ..."). */
     private static boolean isJunkTitle(String title) {
         return JUNK_TITLE.matcher(title).find();
@@ -151,8 +180,7 @@ final class NowPlaying {
                         int metaLen = lenByte * 16;
                         read += metaInt + 1 + metaLen;
                         if (metaLen == 0) continue;
-                        String metaStr = new String(readFully(in, metaLen), StandardCharsets.UTF_8)
-                            .replaceAll("\u0000+$", "");
+                        String metaStr = decodeTitleBytes(readFully(in, metaLen)).replaceAll("\u0000+$", "");
                         Matcher m = STREAM_TITLE.matcher(metaStr);
                         if (m.find()) {
                             String t = m.group(1).trim();
