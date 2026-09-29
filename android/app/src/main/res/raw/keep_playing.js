@@ -49,33 +49,179 @@
     scrapeGlz: function (pageUrl) { return npCall('scrapeGlz', pageUrl, null); }
   };
 
-  // Small exit button inside the app (Android has no tray icon with "exit" like
-  // Windows). It sits in the top-left corner, right above the site's clock, which
-  // moves down a little so nothing is covered.
-  function addExitButton() {
-    if (document.getElementById('shay-exit-btn') || !document.body) return;
+  // ----- Car mode -----
+  // Full-screen "locked" view with only big controls: previous / stop / play /
+  // next station, and an unlock button that needs a long press (so a touch
+  // while driving doesn't leave car mode). The screen stays on meanwhile.
+  var car = null;
+
+  function visibleIndexes() {
+    if (typeof stations === 'undefined' || !stations) return [];
+    var favOnly = (typeof currentTab !== 'undefined' && currentTab === 'fav');
+    var list = [];
+    for (var i = 0; i < stations.length; i++) {
+      if (stations[i] && stations[i].url && (!favOnly || stations[i].favorite)) list.push(i);
+    }
+    if (!list.length && favOnly) return visibleIndexesAll();
+    return list;
+  }
+  function visibleIndexesAll() {
+    var list = [];
+    for (var i = 0; i < stations.length; i++) if (stations[i] && stations[i].url) list.push(i);
+    return list;
+  }
+  function stepStation(dir) {
+    if (typeof selectStation !== 'function') return;
+    var list = visibleIndexes();
+    if (!list.length) return;
+    var cur = (typeof currentIndex === 'number') ? list.indexOf(currentIndex) : -1;
+    var next = cur === -1 ? (dir > 0 ? 0 : list.length - 1) : (cur + dir + list.length) % list.length;
+    selectStation(list[next]);
+  }
+  function carPlay() {
+    if (typeof selectStation !== 'function') return;
+    if (typeof currentIndex === 'number' && currentIndex >= 0) selectStation(currentIndex);
+    else stepStation(1);
+  }
+  function carStop() {
+    var btn = document.getElementById('stopBtn');
+    if (btn) btn.click();
+  }
+
+  function carButton(icon, label, onClick) {
     var b = document.createElement('button');
-    b.id = 'shay-exit-btn';
     b.type = 'button';
-    b.textContent = '✕ יציאה';
-    b.setAttribute('aria-label', 'יציאה מהאפליקציה');
+    b.innerHTML = '<span style="font-size:44px;line-height:1">' + icon + '</span><span style="font-size:15px;margin-top:6px">' + label + '</span>';
+    b.style.cssText = 'flex:1;min-width:0;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;'
+      + 'border:none;border-radius:18px;background:linear-gradient(180deg,#4a4a51,#2a2a2f);color:#ffb040;'
+      + 'box-shadow:0 4px 0 #111,inset 0 1px 0 rgba(255,255,255,.2);font-family:Heebo,Arial,sans-serif;font-weight:700;'
+      + '-webkit-tap-highlight-color:transparent;touch-action:manipulation;';
+    b.addEventListener('click', function (e) { e.stopPropagation(); onClick(); });
+    return b;
+  }
+
+  function openCarMode() {
+    if (car) return;
+    car = document.createElement('div');
+    car.id = 'shay-car-mode';
+    car.setAttribute('dir', 'rtl');
+    car.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#0d0d0f;color:#e9e6df;'
+      + 'display:flex;flex-direction:column;justify-content:space-between;gap:16px;'
+      + 'padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px));'
+      + 'font-family:Heebo,Arial,sans-serif;user-select:none;-webkit-user-select:none;touch-action:none;';
+    // swallow every touch that isn't on one of our buttons (the page underneath is locked)
+    ['click', 'touchstart', 'touchmove', 'pointerdown', 'wheel', 'contextmenu'].forEach(function (t) {
+      car.addEventListener(t, function (e) { if (!e.target.closest('button')) e.preventDefault(); e.stopPropagation(); }, { passive: false });
+    });
+
+    var info = document.createElement('div');
+    info.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:0;';
+    info.innerHTML = '<div style="font-size:14px;color:#8a5a1e;letter-spacing:2px">🚗 מצב רכב</div>'
+      + '<div data-car="name" style="font-size:clamp(30px,9vw,56px);font-weight:900;color:#ffb040;text-shadow:0 0 12px rgba(255,176,64,.6);margin-top:10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>'
+      + '<div data-car="song" style="font-size:clamp(16px,4.5vw,24px);color:#e9e6df;margin-top:10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>'
+      + '<div data-car="status" style="font-size:15px;color:#9a978f;margin-top:8px"></div>';
+
+    var row = document.createElement('div');
+    row.setAttribute('dir', 'ltr');
+    row.style.cssText = 'display:flex;gap:12px;';
+    row.appendChild(carButton('⏮', 'הקודמת', function () { stepStation(-1); }));
+    row.appendChild(carButton('■', 'עצור', carStop));
+    row.appendChild(carButton('▶', 'נגן', carPlay));
+    row.appendChild(carButton('⏭', 'הבאה', function () { stepStation(1); }));
+
+    // Unlock: hold for 1.2 s
+    var unlock = document.createElement('button');
+    unlock.type = 'button';
+    unlock.style.cssText = 'position:relative;overflow:hidden;min-height:56px;border:1px solid #48484f;border-radius:14px;'
+      + 'background:#1c1c1f;color:#e9e6df;font:700 16px Heebo,Arial,sans-serif;-webkit-tap-highlight-color:transparent;touch-action:none;';
+    unlock.innerHTML = '<span data-car="fill" style="position:absolute;inset:0;width:0;background:rgba(255,176,64,.35)"></span>'
+      + '<span style="position:relative">🔓 החזיקו לחוץ לפתיחת הנעילה</span>';
+    var fill = unlock.querySelector('[data-car="fill"]');
+    var holdTimer = null, holdStart = 0, raf = null;
+    function holdStartFn(e) {
+      e.preventDefault(); e.stopPropagation();
+      holdStart = Date.now();
+      var tick = function () {
+        var p = Math.min(1, (Date.now() - holdStart) / 1200);
+        fill.style.width = (p * 100) + '%';
+        if (p >= 1) { closeCarMode(); return; }
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    }
+    function holdEndFn(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      if (raf) cancelAnimationFrame(raf);
+      raf = null;
+      fill.style.width = '0';
+    }
+    unlock.addEventListener('pointerdown', holdStartFn);
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) { unlock.addEventListener(t, holdEndFn); });
+    unlock.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); });
+
+    car.appendChild(info);
+    car.appendChild(row);
+    car.appendChild(unlock);
+    document.body.appendChild(car);
+
+    var update = function () {
+      if (!car) return;
+      var get = function (id) { var el = document.getElementById(id); return el ? (el.textContent || '').trim() : ''; };
+      car.querySelector('[data-car="name"]').textContent = get('vfdName') || 'בחרו תחנה';
+      car.querySelector('[data-car="song"]').textContent = get('vfdSong');
+      car.querySelector('[data-car="status"]').textContent = get('vfdStatus');
+    };
+    update();
+    car._timer = setInterval(update, 1000);
+    try { N.setKeepScreenOn(true); } catch (e) {}
+  }
+
+  function closeCarMode() {
+    if (!car) return;
+    clearInterval(car._timer);
+    car.remove();
+    car = null;
+    try { N.setKeepScreenOn(false); } catch (e) {}
+  }
+
+  // Small buttons above the site's clock: car mode and exit (Android has no tray
+  // icon with "exit" like Windows). The clock moves down a little so nothing is covered.
+  function smallButton(id, text, label) {
+    var b = document.createElement('button');
+    b.id = id;
+    b.type = 'button';
+    b.textContent = text;
+    b.setAttribute('aria-label', label);
     b.style.cssText = 'padding:2px 8px;border:1px solid rgba(255,255,255,.25);border-radius:999px;'
       + 'background:rgba(20,20,22,.85);color:#e9e6df;font:600 11px Heebo,Arial,sans-serif;'
-      + 'line-height:16px;cursor:pointer;';
-    b.addEventListener('click', function () {
+      + 'line-height:16px;cursor:pointer;white-space:nowrap;';
+    return b;
+  }
+  function addExitButton() {
+    if (document.getElementById('shay-exit-btn') || !document.body) return;
+    var exitBtn = smallButton('shay-exit-btn', '✕ יציאה', 'יציאה מהאפליקציה');
+    exitBtn.addEventListener('click', function () {
       if (window.confirm('לצאת מהאפליקציה? הרדיו יפסיק לנגן.')) N.exitApp();
     });
+    var carBtn = smallButton('shay-car-btn', '🚗 מצב רכב', 'מצב רכב');
+    carBtn.addEventListener('click', openCarMode);
+
+    var buttons = document.createElement('div');
+    buttons.style.cssText = 'display:flex;gap:6px;';
+    buttons.appendChild(carBtn);
+    buttons.appendChild(exitBtn);
+
     var clock = document.getElementById('clock');
     if (clock && clock.parentNode) {
       var box = document.createElement('div');
       box.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:4px;';
       clock.parentNode.insertBefore(box, clock);
-      box.appendChild(b);
+      box.appendChild(buttons);
       box.appendChild(clock);
     } else {
-      // No clock on the page: small button fixed in the top-left corner.
-      b.style.cssText += 'position:fixed;left:8px;top:calc(8px + env(safe-area-inset-top, 0px));z-index:2147483647;';
-      document.body.appendChild(b);
+      // No clock on the page: small buttons fixed in the top-left corner.
+      buttons.style.cssText += 'position:fixed;left:8px;top:calc(8px + env(safe-area-inset-top, 0px));z-index:2147483646;';
+      document.body.appendChild(buttons);
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addExitButton);

@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import androidx.lifecycle.Lifecycle;
@@ -105,6 +106,16 @@ public class ShayRadioPlugin extends Plugin implements RadioService.Listener {
         @JavascriptInterface
         public void setVolume(double volume) {
             RadioService.setVolume((float) volume);
+        }
+
+        /** Car mode: keep the screen on while it is shown. */
+        @JavascriptInterface
+        public void setKeepScreenOn(boolean on) {
+            if (getActivity() == null) return;
+            getActivity().runOnUiThread(() -> {
+                if (on) getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                else getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            });
         }
 
         /** The exit button inside the app: stop the radio and close everything. */
