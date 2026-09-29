@@ -6,6 +6,8 @@
 // <audio id="player"> to it, and reports the native player's state back to the
 // element so the site's display and buttons keep working as before.
 (function () {
+  // Only the site's main page (not ad/Netlify iframes inside it).
+  if (window.top !== window) return;
   if (window.__shayRadio) return;
   var N = window.ShayRadioNative;
 
@@ -47,7 +49,9 @@
     scrapeGlz: function (pageUrl) { return npCall('scrapeGlz', pageUrl, null); }
   };
 
-  // Exit button inside the app (Android has no tray icon with "exit" like Windows).
+  // Small exit button inside the app (Android has no tray icon with "exit" like
+  // Windows). It sits in the top-left corner, right above the site's clock, which
+  // moves down a little so nothing is covered.
   function addExitButton() {
     if (document.getElementById('shay-exit-btn') || !document.body) return;
     var b = document.createElement('button');
@@ -55,16 +59,24 @@
     b.type = 'button';
     b.textContent = '✕ יציאה';
     b.setAttribute('aria-label', 'יציאה מהאפליקציה');
-    // Top-left corner, above everything (also clear of the phone's status bar).
-    b.style.cssText = 'position:fixed;left:10px;top:calc(10px + env(safe-area-inset-top, 0px));'
-      + 'z-index:2147483647;'
-      + 'padding:8px 14px;border:1px solid rgba(255,255,255,.25);border-radius:999px;'
-      + 'background:rgba(20,20,22,.85);color:#e9e6df;font:600 14px Heebo,Arial,sans-serif;'
-      + 'box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer;';
+    b.style.cssText = 'padding:2px 8px;border:1px solid rgba(255,255,255,.25);border-radius:999px;'
+      + 'background:rgba(20,20,22,.85);color:#e9e6df;font:600 11px Heebo,Arial,sans-serif;'
+      + 'line-height:16px;cursor:pointer;';
     b.addEventListener('click', function () {
       if (window.confirm('לצאת מהאפליקציה? הרדיו יפסיק לנגן.')) N.exitApp();
     });
-    document.body.appendChild(b);
+    var clock = document.getElementById('clock');
+    if (clock && clock.parentNode) {
+      var box = document.createElement('div');
+      box.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:4px;';
+      clock.parentNode.insertBefore(box, clock);
+      box.appendChild(b);
+      box.appendChild(clock);
+    } else {
+      // No clock on the page: small button fixed in the top-left corner.
+      b.style.cssText += 'position:fixed;left:8px;top:calc(8px + env(safe-area-inset-top, 0px));z-index:2147483647;';
+      document.body.appendChild(b);
+    }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addExitButton);
   else addExitButton();
