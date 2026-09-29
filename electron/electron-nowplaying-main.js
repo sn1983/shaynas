@@ -185,30 +185,12 @@ const GLZ_SCRIPT = `
 
 // ---- On-demand audio pages: find the audio URL a program page plays -------
 // Opens the page in a hidden, muted window, lets its own player set up, and
-// returns the first real (http/https) audio URL found: <audio>/<source>, common
-// data-* attributes, or an audio file the page itself requested. Checks every
-// 500 ms for up to ~10 s. Returns null when nothing is found.
-const PAGE_AUDIO_SCRIPT = `
-  (function () {
-    const ok = (u) => typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null;
-    const a = document.querySelector('audio, video');
-    const fromEl = a && (ok(a.currentSrc) || ok(a.src));
-    if (fromEl) return fromEl;
-    const source = document.querySelector('audio source, video source');
-    if (source && ok(source.src)) return source.src;
-    const withData = document.querySelector('[data-audio-src], [data-src], [data-mp3], [data-stream-url], [data-audio], [data-file]');
-    if (withData) {
-      for (const n of ['data-audio-src', 'data-src', 'data-mp3', 'data-stream-url', 'data-audio', 'data-file']) {
-        const v = withData.getAttribute(n);
-        if (v && /\\.(mp3|m4a|aac|m3u8|ogg|wav)(\\?|$)/i.test(v)) return new URL(v, location.href).href;
-      }
-    }
-    const res = performance.getEntriesByType('resource')
-      .map((e) => e.name)
-      .find((n) => /\\.(mp3|m4a|aac|m3u8)(\\?|$)/i.test(n));
-    return ok(res) || null;
-  })();
-`;
+// returns a real (http/https) audio URL: from <audio>/<source>, any data-*
+// attribute holding an audio file (e.g. data-url, data-player-hls-src), or an
+// audio file the page requested. If the page address names an episode
+// (?audio=...), the matching file is preferred. Checks every 500 ms for up to
+// ~10 s. Returns null when nothing is found.
+const PAGE_AUDIO_SCRIPT = "(function () {\n  var AUDIO = /\\.(mp3|m4a|aac|m3u8|ogg|wav|opus)(\\?|$)/i;\n  var isHttp = function (u) { return typeof u === 'string' && /^https?:\\/\\//i.test(u); };\n  var found = [];\n  var add = function (u, fromPlayer) {\n    try {\n      if (!u) return;\n      var h = new URL(u, location.href).href;\n      if (!isHttp(h) || (!fromPlayer && !AUDIO.test(h))) return;\n      if (found.indexOf(h) < 0) found.push(h);\n    } catch (e) {}\n  };\n  document.querySelectorAll('audio, video').forEach(function (a) { add(a.currentSrc || a.src, true); });\n  document.querySelectorAll('audio source, video source').forEach(function (s) { add(s.src, true); });\n  document.querySelectorAll('*').forEach(function (el) {\n    for (var i = 0; i < el.attributes.length; i++) {\n      var at = el.attributes[i];\n      if (at.name.indexOf('data-') === 0 && AUDIO.test(at.value)) add(at.value, false);\n    }\n  });\n  performance.getEntriesByType('resource').forEach(function (e) { add(e.name, false); });\n  if (!found.length) return null;\n  // The page address may name a specific episode (e.g. ?audio=minheret-25-06-25):\n  // prefer the file whose name matches it.\n  var norm = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9\u0590-\u05ff]/g, ''); };\n  var hints = [];\n  var q = new URLSearchParams(location.search);\n  q.forEach(function (v) { if (norm(v).length >= 4) hints.push(norm(v)); });\n  var match = null;\n  for (var h = 0; h < hints.length && !match; h++) {\n    for (var j = 0; j < found.length; j++) {\n      var file = decodeURIComponent(found[j].split('?')[0].split('/').pop());\n      if (norm(file).indexOf(hints[h]) >= 0) { match = found[j]; break; }\n    }\n  }\n  return { url: match || found[0], exact: !!match || !hints.length };\n})()";
 
 ipcMain.handle('radio:scrapePageAudio', async (event, pageUrl) => {
   assertFromSite(event);
@@ -227,12 +209,18 @@ ipcMain.handle('radio:scrapePageAudio', async (event, pageUrl) => {
     win.webContents.setAudioMuted(true);
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     await win.loadURL(u.href);
+    // A page can list many episodes; wait for the one its address names (?audio=...),
+    // otherwise settle for the first audio file found.
+    let best = null;
     for (let i = 0; i < 20; i++) {
       const found = await win.webContents.executeJavaScript(PAGE_AUDIO_SCRIPT);
-      if (found) return found;
+      if (found && found.url) {
+        if (found.exact) return found.url;
+        best = found.url;
+      }
       await new Promise((r) => setTimeout(r, 500));
     }
-    return null;
+    return best;
   } catch {
     return null;
   } finally {

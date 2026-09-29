@@ -12,9 +12,9 @@ app.whenReady().then(async () => {
   const html = await run('document.documentElement.outerHTML');
   console.log('site mentions scrapePageAudio:', (html.match(/scrapePageAudio/g) || []).length, '| "תוכן נבחר":', html.includes('תוכן נבחר'));
   (html.match(/.{0,160}scrapePageAudio.{0,200}/g) || []).slice(0, 6).forEach((m) => console.log('  ctx:', m.replace(/\s+/g, ' ')));
-  const pages = [...new Set((html.match(/(?:pageUrl|page|url)\s*:\s*["'](https?:\/\/[^"']+)["']/g) || [])
-    .map((m) => m.match(/https?:\/\/[^"']+/)[0])
-    .filter((u) => !/glz\.co\.il|\.mp3|\.m3u8|icecast|stream|livecdn|streamgates|mediacast|cybercdn|ecast|93fm|radionahariya|jewishmusic|mizrahit|tritondigital|kan\.org\.il\/api/i.test(u)))];
+  (html.match(/\{[^{}]{0,400}pageUrl[^{}]{0,400}\}/g) || []).slice(0, 12).forEach((m) => console.log('  item:', m.replace(/\s+/g, ' ')));
+  const pages = [...new Set((html.match(/pageUrl\s*:\s*["'`](https?:\/\/[^"'`]+)["'`]/g) || [])
+    .map((m) => m.match(/https?:\/\/[^"'`]+/)[0]))];
   console.log('candidate program pages:', pages.length);
   for (const p of pages) {
     const t0 = Date.now();

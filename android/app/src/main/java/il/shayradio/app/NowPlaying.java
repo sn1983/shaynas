@@ -212,7 +212,7 @@ final class NowPlaying {
     // Loads the page in a hidden WebView (no sound), lets its own player set up and
     // returns the first real audio URL: <audio>/<source>, common data-* attributes,
     // or an audio file the page requested. Checks every 500 ms for up to ~10 s.
-    private static final String PAGE_AUDIO_SCRIPT = "(function(){var ok=function(u){return typeof u==='string'&&/^https?:\\/\\//i.test(u)?u:null;};var a=document.querySelector('audio, video');var f=a&&(ok(a.currentSrc)||ok(a.src));if(f)return f;var s=document.querySelector('audio source, video source');if(s&&ok(s.src))return s.src;var d=document.querySelector('[data-audio-src],[data-src],[data-mp3],[data-stream-url],[data-audio],[data-file]');if(d){var ns=['data-audio-src','data-src','data-mp3','data-stream-url','data-audio','data-file'];for(var i=0;i<ns.length;i++){var v=d.getAttribute(ns[i]);if(v&&/\\.(mp3|m4a|aac|m3u8|ogg|wav)(\\?|$)/i.test(v))return new URL(v,location.href).href;}}var r=performance.getEntriesByType('resource').map(function(e){return e.name;}).find(function(n){return /\\.(mp3|m4a|aac|m3u8)(\\?|$)/i.test(n);});return ok(r)||null;})()";
+    private static final String PAGE_AUDIO_SCRIPT = "(function () { var AUDIO = /\\.(mp3|m4a|aac|m3u8|ogg|wav|opus)(\\?|$)/i; var isHttp = function (u) { return typeof u === 'string' && /^https?:\\/\\//i.test(u); }; var found = []; var add = function (u, fromPlayer) { try { if (!u) return; var h = new URL(u, location.href).href; if (!isHttp(h) || (!fromPlayer && !AUDIO.test(h))) return; if (found.indexOf(h) < 0) found.push(h); } catch (e) {} }; document.querySelectorAll('audio, video').forEach(function (a) { add(a.currentSrc || a.src, true); }); document.querySelectorAll('audio source, video source').forEach(function (s) { add(s.src, true); }); document.querySelectorAll('*').forEach(function (el) { for (var i = 0; i < el.attributes.length; i++) { var at = el.attributes[i]; if (at.name.indexOf('data-') === 0 && AUDIO.test(at.value)) add(at.value, false); } }); performance.getEntriesByType('resource').forEach(function (e) { add(e.name, false); }); if (!found.length) return null; var norm = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9\u0590-\u05ff]/g, ''); }; var hints = []; var q = new URLSearchParams(location.search); q.forEach(function (v) { if (norm(v).length >= 4) hints.push(norm(v)); }); var match = null; for (var h = 0; h < hints.length && !match; h++) { for (var j = 0; j < found.length; j++) { var file = decodeURIComponent(found[j].split('?')[0].split('/').pop()); if (norm(file).indexOf(hints[h]) >= 0) { match = found[j]; break; } } } return { url: match || found[0], exact: !!match || !hints.length }; })()";
 
     @SuppressLint("SetJavaScriptEnabled")
     static void scrapePageAudio(Context context, String url, Callback cb) {
@@ -236,23 +236,30 @@ final class NowPlaying {
 
             final int[] attempts = { 0 };
             final boolean[] finished = { false };
+            final String[] best = { null };
             Runnable[] poll = new Runnable[1];
             poll[0] = () -> {
                 if (finished[0]) return;
                 web.evaluateJavascript(PAGE_AUDIO_SCRIPT, value -> {
                     if (finished[0]) return;
-                    String found = null;
+                    boolean exact = false;
                     try {
-                        Object v = new JSONArray("[" + value + "]").get(0);
-                        if (v instanceof String && isHttpUrl((String) v)) found = (String) v;
+                        JSONObject r = new JSONObject(value); // {url, exact} or "null"
+                        String u = r.optString("url", null);
+                        if (u != null && isHttpUrl(u)) {
+                            best[0] = u;
+                            exact = r.optBoolean("exact", false);
+                        }
                     } catch (Exception ignored) {
-                        // not ready yet
+                        // nothing yet
                     }
-                    if (found != null || ++attempts[0] >= 20) {
+                    // A page can list many episodes: wait for the one its address names,
+                    // otherwise settle for the first audio file found.
+                    if (exact || ++attempts[0] >= 20) {
                         finished[0] = true;
                         web.stopLoading();
                         web.destroy();
-                        cb.done(found);
+                        cb.done(best[0]);
                     } else {
                         main.postDelayed(poll[0], 500);
                     }
