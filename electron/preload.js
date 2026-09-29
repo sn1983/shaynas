@@ -132,4 +132,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fetchRaw: (url) => ipcRenderer.invoke('radio:fetch', url),
   icyTitle: (streamUrl) => ipcRenderer.invoke('radio:icyTitle', streamUrl),
   scrapeGlz: (pageUrl) => ipcRenderer.invoke('radio:scrapeGlz', pageUrl),
+  scrapePageAudio: (pageUrl) => ipcRenderer.invoke('radio:scrapePageAudio', pageUrl),
 });

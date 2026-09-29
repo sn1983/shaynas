@@ -208,6 +208,60 @@ final class NowPlaying {
         return buf;
     }
 
+    // ---- On-demand audio pages: the audio URL a program's web page plays ----
+    // Loads the page in a hidden WebView (no sound), lets its own player set up and
+    // returns the first real audio URL: <audio>/<source>, common data-* attributes,
+    // or an audio file the page requested. Checks every 500 ms for up to ~10 s.
+    private static final String PAGE_AUDIO_SCRIPT = "(function(){var ok=function(u){return typeof u==='string'&&/^https?:\\/\\//i.test(u)?u:null;};var a=document.querySelector('audio, video');var f=a&&(ok(a.currentSrc)||ok(a.src));if(f)return f;var s=document.querySelector('audio source, video source');if(s&&ok(s.src))return s.src;var d=document.querySelector('[data-audio-src],[data-src],[data-mp3],[data-stream-url],[data-audio],[data-file]');if(d){var ns=['data-audio-src','data-src','data-mp3','data-stream-url','data-audio','data-file'];for(var i=0;i<ns.length;i++){var v=d.getAttribute(ns[i]);if(v&&/\\.(mp3|m4a|aac|m3u8|ogg|wav)(\\?|$)/i.test(v))return new URL(v,location.href).href;}}var r=performance.getEntriesByType('resource').map(function(e){return e.name;}).find(function(n){return /\\.(mp3|m4a|aac|m3u8)(\\?|$)/i.test(n);});return ok(r)||null;})()";
+
+    @SuppressLint("SetJavaScriptEnabled")
+    static void scrapePageAudio(Context context, String url, Callback cb) {
+        if (!isHttpUrl(url)) {
+            cb.done(null);
+            return;
+        }
+        main.post(() -> {
+            WebView web;
+            try {
+                web = new WebView(context);
+            } catch (Exception e) {
+                cb.done(null);
+                return;
+            }
+            web.getSettings().setJavaScriptEnabled(true);
+            web.getSettings().setDomStorageEnabled(true);
+            web.getSettings().setMediaPlaybackRequiresUserGesture(true); // never play sound
+            web.setWebViewClient(new WebViewClient());
+            web.loadUrl(url);
+
+            final int[] attempts = { 0 };
+            final boolean[] finished = { false };
+            Runnable[] poll = new Runnable[1];
+            poll[0] = () -> {
+                if (finished[0]) return;
+                web.evaluateJavascript(PAGE_AUDIO_SCRIPT, value -> {
+                    if (finished[0]) return;
+                    String found = null;
+                    try {
+                        Object v = new JSONArray("[" + value + "]").get(0);
+                        if (v instanceof String && isHttpUrl((String) v)) found = (String) v;
+                    } catch (Exception ignored) {
+                        // not ready yet
+                    }
+                    if (found != null || ++attempts[0] >= 20) {
+                        finished[0] = true;
+                        web.stopLoading();
+                        web.destroy();
+                        cb.done(found);
+                    } else {
+                        main.postDelayed(poll[0], 500);
+                    }
+                });
+            };
+            main.postDelayed(poll[0], 1000);
+        });
+    }
+
     // ---- glz.co.il: hidden WebView that runs the page's own JS ----
     // In .playLiveText the page shows the program (.title) and the current song
     // (.talent = "artist - title"), filled in by the page's own JS.

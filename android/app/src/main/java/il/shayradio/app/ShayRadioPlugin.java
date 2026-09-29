@@ -137,6 +137,11 @@ public class ShayRadioPlugin extends Plugin implements RadioService.Listener {
         }
 
         @JavascriptInterface
+        public void scrapePageAudio(String id, String url) {
+            ifFromSite(id, () -> NowPlaying.scrapePageAudio(getContext(), url, result -> deliver(id, result)));
+        }
+
+        @JavascriptInterface
         public void scrapeGlz(String id, String url) {
             ifFromSite(id, () -> NowPlaying.scrapeGlz(getContext(), url, result -> deliver(id, result)));
         }

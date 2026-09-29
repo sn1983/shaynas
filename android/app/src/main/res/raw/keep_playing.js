@@ -46,7 +46,8 @@
   window.electronAPI = {
     fetchRaw: function (url) { return npCall('fetchRaw', url, { ok: false, status: 0, text: '', error: 'failed' }); },
     icyTitle: function (streamUrl) { return npCall('icyTitle', streamUrl, null); },
-    scrapeGlz: function (pageUrl) { return npCall('scrapeGlz', pageUrl, null); }
+    scrapeGlz: function (pageUrl) { return npCall('scrapeGlz', pageUrl, null); },
+    scrapePageAudio: function (pageUrl) { return npCall('scrapePageAudio', pageUrl, null); }
   };
 
   // ----- Car mode -----

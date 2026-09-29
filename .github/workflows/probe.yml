@@ -1,0 +1,15 @@
+name: Probe on-demand pages (temporary)
+on:
+  push:
+    branches: [claude/electron-shay-radio-app-8klop2]
+    paths: [.github/workflows/probe.yml, .github/probe/**]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: xvfb-run -a npx electron --no-sandbox .github/probe/e2e.js 2>&1 | grep -v -iE 'dbus|gpu|viz|vaapi|libva' | cut -c1-900 | head -120
+        timeout-minutes: 6

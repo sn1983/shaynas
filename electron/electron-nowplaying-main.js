@@ -5,6 +5,7 @@
  *
  *   radio:fetch      -> { ok, status, text }   raw text of a URL (Triton/Kan XML, APIs)
  *   radio:icyTitle   -> string | null          ICY StreamTitle of an Icecast/SHOUTcast stream
+ *   radio:scrapePageAudio -> string | null     audio URL that a program's web page plays
  *   radio:scrapeGlz  -> string | null          glz.co.il current song ("artist - title"), or the
  *                                               program name during talk; read from a hidden window
  *                                               after the page's own JS has filled it in
@@ -181,6 +182,63 @@ const GLZ_SCRIPT = `
     return { song: read('.talent') || null, program: read('.title') || null };
   })();
 `;
+
+// ---- On-demand audio pages: find the audio URL a program page plays -------
+// Opens the page in a hidden, muted window, lets its own player set up, and
+// returns the first real (http/https) audio URL found: <audio>/<source>, common
+// data-* attributes, or an audio file the page itself requested. Checks every
+// 500 ms for up to ~10 s. Returns null when nothing is found.
+const PAGE_AUDIO_SCRIPT = `
+  (function () {
+    const ok = (u) => typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null;
+    const a = document.querySelector('audio, video');
+    const fromEl = a && (ok(a.currentSrc) || ok(a.src));
+    if (fromEl) return fromEl;
+    const source = document.querySelector('audio source, video source');
+    if (source && ok(source.src)) return source.src;
+    const withData = document.querySelector('[data-audio-src], [data-src], [data-mp3], [data-stream-url], [data-audio], [data-file]');
+    if (withData) {
+      for (const n of ['data-audio-src', 'data-src', 'data-mp3', 'data-stream-url', 'data-audio', 'data-file']) {
+        const v = withData.getAttribute(n);
+        if (v && /\\.(mp3|m4a|aac|m3u8|ogg|wav)(\\?|$)/i.test(v)) return new URL(v, location.href).href;
+      }
+    }
+    const res = performance.getEntriesByType('resource')
+      .map((e) => e.name)
+      .find((n) => /\\.(mp3|m4a|aac|m3u8)(\\?|$)/i.test(n));
+    return ok(res) || null;
+  })();
+`;
+
+ipcMain.handle('radio:scrapePageAudio', async (event, pageUrl) => {
+  assertFromSite(event);
+  let u;
+  try {
+    u = parseHttpUrl(pageUrl);
+  } catch {
+    return null;
+  }
+  let win;
+  try {
+    win = new BrowserWindow({
+      show: false,
+      webPreferences: { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false },
+    });
+    win.webContents.setAudioMuted(true);
+    win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    await win.loadURL(u.href);
+    for (let i = 0; i < 20; i++) {
+      const found = await win.webContents.executeJavaScript(PAGE_AUDIO_SCRIPT);
+      if (found) return found;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    if (win && !win.isDestroyed()) win.destroy();
+  }
+});
 
 // ---- glz.co.il scraper: hidden, muted window that runs the page's own JS ----
 ipcMain.handle('radio:scrapeGlz', async (event, pageUrl) => {
