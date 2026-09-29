@@ -55,7 +55,9 @@
     b.type = 'button';
     b.textContent = '✕ יציאה';
     b.setAttribute('aria-label', 'יציאה מהאפליקציה');
-    b.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:2147483647;'
+    // Top-left corner, above everything (also clear of the phone's status bar).
+    b.style.cssText = 'position:fixed;left:10px;top:calc(10px + env(safe-area-inset-top, 0px));'
+      + 'z-index:2147483647;'
       + 'padding:8px 14px;border:1px solid rgba(255,255,255,.25);border-radius:999px;'
       + 'background:rgba(20,20,22,.85);color:#e9e6df;font:600 14px Heebo,Arial,sans-serif;'
       + 'box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer;';
