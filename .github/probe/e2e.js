@@ -36,5 +36,28 @@ app.whenReady().then(async () => {
       g.destroy();
     }
   }
+  // glz episode page: what does pressing play load?
+  const ep = 'https://glz.co.il/גלגלצ/תכניות/המצעד-השבועי/המצעד-השבועי-עם-דלית-רצשטר-030926/';
+  const g = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
+  g.webContents.setAudioMuted(true);
+  const reqs = [];
+  g.webContents.session.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (d, cb) => {
+    if (/mp3|m4a|aac|m3u8|bynetcdn|podcast|umbraco\/api|omny|audio/i.test(d.url) && !/youtube|google|\.(png|jpg|svg|css|woff)/i.test(d.url)) reqs.push(d.resourceType + ' ' + d.url.slice(0, 220));
+    cb({});
+  });
+  await g.loadURL(ep).catch(() => {});
+  await new Promise((r) => setTimeout(r, 4000));
+  const info = await g.webContents.executeJavaScript(`JSON.stringify({
+    mp3InHtml: (document.documentElement.outerHTML.match(/[^"'\\s<>]{0,120}\\.(mp3|m4a|aac|m3u8)[^"'\\s<>]{0,60}/gi) || []).slice(0, 10),
+    playButtons: [...document.querySelectorAll('button,a,[role=button],[x-on\\:click],[\\@click]')].filter(e => /play|האזנה|נגן|listen/i.test((e.className||'') + ' ' + (e.getAttribute('aria-label')||'') + ' ' + (e.textContent||'').slice(0,30) + ' ' + [...e.attributes].map(a=>a.name+'='+a.value).join(' '))).slice(0, 12)
+      .map(e => e.tagName + ' ' + [...e.attributes].map(a => a.name + '=' + a.value.slice(0, 100)).join(' | ') + ' :: ' + (e.textContent||'').trim().slice(0, 40))
+  })`).catch((e) => 'ERR ' + e.message);
+  console.log('glz episode info:', info);
+  console.log('glz requests before click:', JSON.stringify(reqs));
+  reqs.length = 0;
+  await g.webContents.executeJavaScript(`[...document.querySelectorAll('button,a,[role=button]')].filter(e => /play|האזנה|נגן|listen/i.test((e.className||'') + ' ' + (e.getAttribute('aria-label')||'') + ' ' + (e.textContent||'').slice(0,30))).slice(0, 6).forEach(e => { try { e.click(); } catch (x) {} }); 1`).catch(() => {});
+  await new Promise((r) => setTimeout(r, 6000));
+  console.log('glz requests after clicking play:', JSON.stringify(reqs));
+  console.log('glz audio after click:', await g.webContents.executeJavaScript(`JSON.stringify([...document.querySelectorAll('audio,video')].map(a => a.currentSrc || a.src))`).catch(() => 'ERR'));
   app.exit(0);
 });
