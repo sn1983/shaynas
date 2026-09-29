@@ -47,6 +47,26 @@
     scrapeGlz: function (pageUrl) { return npCall('scrapeGlz', pageUrl, null); }
   };
 
+  // Exit button inside the app (Android has no tray icon with "exit" like Windows).
+  function addExitButton() {
+    if (document.getElementById('shay-exit-btn') || !document.body) return;
+    var b = document.createElement('button');
+    b.id = 'shay-exit-btn';
+    b.type = 'button';
+    b.textContent = '✕ יציאה';
+    b.setAttribute('aria-label', 'יציאה מהאפליקציה');
+    b.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:2147483647;'
+      + 'padding:8px 14px;border:1px solid rgba(255,255,255,.25);border-radius:999px;'
+      + 'background:rgba(20,20,22,.85);color:#e9e6df;font:600 14px Heebo,Arial,sans-serif;'
+      + 'box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer;';
+    b.addEventListener('click', function () {
+      if (window.confirm('לצאת מהאפליקציה? הרדיו יפסיק לנגן.')) N.exitApp();
+    });
+    document.body.appendChild(b);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addExitButton);
+  else addExitButton();
+
   // HLS stations (.m3u8) are played natively too: make the site hand the
   // playlist URL to the player instead of using hls.js in the page.
   var realHls;

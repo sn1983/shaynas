@@ -9,6 +9,9 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.media.AudioManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -59,7 +62,9 @@ public class RadioService extends Service {
 
     private static final String CHANNEL_ID = "radio_playback";
     private static final int NOTIFICATION_ID = 1;
-    private static final int MAX_RETRIES = 5;
+    private static final int MAX_RETRY_DELAY_MS = 30000;
+    private static final int RESUME_CHECK_MS = 5000;
+    private static final int RESUME_CHECK_MAX = 12 * 60; // give up auto-resume after ~1 hour
 
     static volatile Listener listener;
 
@@ -75,6 +80,12 @@ public class RadioService extends Service {
     private MediaSessionCompat session;
     private boolean wantPlaying;
     private int retries;
+    // Paused because another app took over the audio; resume when it's quiet again.
+    private boolean interrupted;
+    private int resumeChecks;
+    private AudioManager audioManager;
+    private ConnectivityManager connectivity;
+    private ConnectivityManager.NetworkCallback networkCallback;
 
     // ----- Called from the rest of the app (any thread) -----
 
@@ -166,13 +177,39 @@ public class RadioService extends Service {
             public void onIsPlayingChanged(boolean isPlaying) {
                 if (isPlaying) {
                     retries = 0;
+                    interrupted = false;
                     notifyState("playing");
-                } else if (wantPlaying && player.getPlaybackState() == Player.STATE_BUFFERING) {
+                } else if (wantPlaying) {
                     notifyState("buffering");
-                } else if (!player.getPlayWhenReady()) {
-                    // Paused by the system (phone call, headphones unplugged, ...).
+                }
+                refresh();
+            }
+
+            @Override
+            public void onPlayWhenReadyChanged(boolean playWhenReady, int reason) {
+                if (playWhenReady || !wantPlaying) return;
+                if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY) {
+                    // Headphones unplugged: a deliberate stop, don't restart by ourselves.
                     wantPlaying = false;
                     notifyState("paused");
+                    refresh();
+                } else if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
+                    // Another app started playing: wait until it's quiet, then resume.
+                    interrupted = true;
+                    resumeChecks = 0;
+                    main.removeCallbacks(resumeCheck);
+                    main.postDelayed(resumeCheck, RESUME_CHECK_MS);
+                    notifyState("buffering");
+                    refresh();
+                }
+            }
+
+            @Override
+            public void onPlaybackSuppressionReasonChanged(int reason) {
+                // A phone call / short sound (navigation, voice message) paused us
+                // temporarily. When it ends, reconnect so we play live, not old audio.
+                if (reason == Player.PLAYBACK_SUPPRESSION_REASON_NONE && wantPlaying && !player.isPlaying()) {
+                    startPlayback();
                 }
                 refresh();
             }
@@ -186,15 +223,19 @@ public class RadioService extends Service {
 
             @Override
             public void onPlayerError(PlaybackException error) {
-                if (wantPlaying && retries < MAX_RETRIES) {
-                    retryLater(); // network drop etc.: reconnect
+                // Network drop, server hiccup...: keep reconnecting while the user wants
+                // the radio on (waiting a little longer each time, up to 30 s).
+                if (wantPlaying) {
+                    retryLater();
                 } else {
-                    wantPlaying = false;
                     notifyState("error");
                     refresh();
                 }
             }
         });
+
+        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        registerNetworkCallback();
 
         session = new MediaSessionCompat(this, "ShayRadio");
         session.setCallback(new MediaSessionCompat.Callback() {
@@ -232,6 +273,8 @@ public class RadioService extends Service {
     private void startPlayback() {
         if (url == null) return;
         main.removeCallbacks(retryRunnable);
+        main.removeCallbacks(resumeCheck);
+        interrupted = false;
         wantPlaying = true;
         MediaItem.Builder item = new MediaItem.Builder().setUri(url);
         if (url.toLowerCase().contains(".m3u8")) item.setMimeType(MimeTypes.APPLICATION_M3U8);
@@ -244,7 +287,9 @@ public class RadioService extends Service {
 
     private void stopPlayback() {
         main.removeCallbacks(retryRunnable);
+        main.removeCallbacks(resumeCheck);
         wantPlaying = false;
+        interrupted = false;
         retries = 0;
         player.stop();
         notifyState("paused");
@@ -256,10 +301,65 @@ public class RadioService extends Service {
     };
 
     private void retryLater() {
+        int delay = Math.min(MAX_RETRY_DELAY_MS, 2000 << Math.min(retries, 4)); // 2,4,8,16,30 s
         retries++;
         notifyState("buffering");
+        refresh();
         main.removeCallbacks(retryRunnable);
-        main.postDelayed(retryRunnable, 3000);
+        main.postDelayed(retryRunnable, delay);
+    }
+
+    /** After another app took the audio: resume once nothing else is playing and no call is on. */
+    private final Runnable resumeCheck = new Runnable() {
+        @Override
+        public void run() {
+            if (!wantPlaying || !interrupted) return;
+            boolean quiet = audioManager == null
+                || (!audioManager.isMusicActive() && audioManager.getMode() == AudioManager.MODE_NORMAL);
+            if (quiet) {
+                startPlayback();
+            } else if (++resumeChecks < RESUME_CHECK_MAX) {
+                main.postDelayed(this, RESUME_CHECK_MS);
+            } else {
+                stopPlayback(); // waited an hour: give up
+            }
+        }
+    };
+
+    /** Reconnect right away when the internet comes back. */
+    private void registerNetworkCallback() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return;
+        connectivity = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connectivity == null) return;
+        networkCallback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                main.post(() -> {
+                    if (wantPlaying && !interrupted && player != null && !player.isPlaying()) {
+                        retries = 0;
+                        startPlayback();
+                    }
+                });
+            }
+        };
+        try {
+            connectivity.registerDefaultNetworkCallback(networkCallback);
+        } catch (Exception e) {
+            networkCallback = null;
+        }
+    }
+
+    /** Close the whole app (used by the exit button inside the app). */
+    static void requestExit(Context context) {
+        main.post(() -> {
+            RadioService s = instance;
+            if (s != null) {
+                s.exitApp();
+            } else {
+                Listener l = listener;
+                if (l != null) l.exit();
+            }
+        });
     }
 
     private void exitApp() {
@@ -284,6 +384,10 @@ public class RadioService extends Service {
         String text;
         if (!playing) {
             text = "עצור - לחצו ▶ כדי לנגן";
+        } else if (interrupted) {
+            text = "הושהה בגלל צליל אחר - ימשיך אוטומטית";
+        } else if (retries > 0 && (player == null || !player.isPlaying())) {
+            text = "מתחבר מחדש...";
         } else if (player != null && player.isPlaying()) {
             text = title.isEmpty() ? "מנגן" : "מנגן: " + title;
         } else {
@@ -351,6 +455,14 @@ public class RadioService extends Service {
     public void onDestroy() {
         if (instance == this) instance = null;
         main.removeCallbacks(retryRunnable);
+        main.removeCallbacks(resumeCheck);
+        if (connectivity != null && networkCallback != null) {
+            try {
+                connectivity.unregisterNetworkCallback(networkCallback);
+            } catch (Exception ignored) {
+                // already unregistered
+            }
+        }
         if (player != null) {
             player.release();
             player = null;

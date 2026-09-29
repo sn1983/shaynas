@@ -48,9 +48,55 @@ webFrame.executeJavaScript(`(${function keepPlaying() {
   document.addEventListener('play', (e) => { track(e.target); report(); }, true);
   setInterval(() => { scan(); report(); }, 2000);
 
+  // ----- Automatic reconnect -----
+  // While the user wants the radio on, re-tune the station whenever the stream
+  // errors, ends, or is stuck loading (network drop, server hiccup), waiting a
+  // little longer each time (3 s ... 30 s), and right away when the internet
+  // comes back. Pressing stop (site button or tray) turns this off.
+  let wantPlay = false;
+  let retries = 0;
+  let retryTimer = null;
+  let stuckSince = 0;
+  const player = () => document.getElementById('player');
+  const canRetune = () => typeof selectStation === 'function' && typeof currentIndex === 'number' && currentIndex >= 0;
+  const retune = () => {
+    retryTimer = null;
+    if (!wantPlay || !canRetune()) return;
+    const el = player();
+    if (el && !el.paused && el.readyState >= 3) { retries = 0; return; } // recovered by itself
+    retries++;
+    selectStation(currentIndex);
+  };
+  const scheduleRetune = (delay) => {
+    if (!wantPlay || retryTimer) return;
+    const d = delay != null ? delay : Math.min(30000, 3000 * Math.pow(2, Math.min(retries, 4)));
+    retryTimer = setTimeout(retune, d);
+  };
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.closest && e.target.closest('#stopBtn')) { wantPlay = false; clearTimeout(retryTimer); retryTimer = null; }
+  }, true);
+  document.addEventListener('playing', (e) => {
+    if (e.target && e.target.id === 'player') { wantPlay = true; retries = 0; stuckSince = 0; }
+  }, true);
+  for (const type of ['error', 'ended', 'stalled']) {
+    document.addEventListener(type, (e) => { if (e.target && e.target.id === 'player') scheduleRetune(); }, true);
+  }
+  window.addEventListener('online', () => { if (wantPlay) { clearTimeout(retryTimer); retryTimer = null; scheduleRetune(1000); } });
+  setInterval(() => {
+    const el = player();
+    if (!wantPlay || !el) return;
+    const ok = !el.paused && el.readyState >= 3;
+    if (ok) { stuckSince = 0; return; }
+    if (!stuckSince) stuckSince = Date.now();
+    else if (Date.now() - stuckSince > 15000) { stuckSince = 0; scheduleRetune(0); }
+  }, 5000);
+
   // Used by the tray menu. Prefer the site's own controls so its screen stays in sync.
   window.__shayRadio = {
     stop() {
+      wantPlay = false;
+      clearTimeout(retryTimer);
+      retryTimer = null;
       const btn = document.getElementById('stopBtn');
       if (btn) btn.click();
       scan();
@@ -60,6 +106,7 @@ webFrame.executeJavaScript(`(${function keepPlaying() {
     play() {
       // Re-tune the current station so it reconnects to the live broadcast.
       if (typeof selectStation === 'function' && typeof currentIndex === 'number' && currentIndex >= 0) {
+        wantPlay = true;
         selectStation(currentIndex);
         return true;
       }

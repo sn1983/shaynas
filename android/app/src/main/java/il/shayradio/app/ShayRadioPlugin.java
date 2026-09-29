@@ -107,6 +107,12 @@ public class ShayRadioPlugin extends Plugin implements RadioService.Listener {
             RadioService.setVolume((float) volume);
         }
 
+        /** The exit button inside the app: stop the radio and close everything. */
+        @JavascriptInterface
+        public void exitApp() {
+            RadioService.requestExit(getContext());
+        }
+
         // ----- Now-playing helpers (window.electronAPI on the page) -----
 
         @JavascriptInterface
