@@ -1,8 +1,8 @@
-name: Discover more stations (temporary)
+name: Verify on-demand items (temporary)
 on:
   push:
     branches: [claude/electron-shay-radio-app-8klop2]
-    paths: [.github/workflows/probe.yml, .github/probe/**]
+    paths: [.github/workflows/probe.yml, .github/probe/**, site/radio-israel.html, electron/**]
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -11,5 +11,5 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm ci
-      - run: xvfb-run -a npx electron --no-sandbox .github/probe/discover2.js 2>&1 | grep '^RES' | cut -c1-600
-        timeout-minutes: 50
+      - run: xvfb-run -a npx electron --no-sandbox .github/probe/verify.js 2>&1 | grep -E "^(OK|FAIL)"
+        timeout-minutes: 15

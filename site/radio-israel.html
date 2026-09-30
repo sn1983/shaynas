@@ -529,50 +529,64 @@ const CONTENT_ITEMS = [
   {
     id: 'glglz-kolot-hahayalim',
     name: 'קולות החיילים — גלגלצ',
-    sub: 'השירים שבוחרות יחידות צה"ל · הפרק האחרון',
+    sub: 'השירים שבוחרות יחידות צה"ל · מוזיקה',
     pageUrl: 'https://glz.co.il/גלגלצ/תכניות/קולות-החיילים',
-  },
-  {
-    id: 'glglz-kwami',
-    name: 'קוואמי — גלגלצ',
-    sub: 'מוזיקה חדשה והקצת אחרת · הפרק האחרון',
-    pageUrl: 'https://glz.co.il/גלגלצ/תכניות/קוואמי',
   },
   {
     id: 'glglz-hadar-marks',
     name: 'מדינה בדרך עם הדר מרקס — גלגלצ',
-    sub: 'שירים ושיחה על הבוקר · הפרק האחרון',
+    sub: 'שירים ושיחה על הבוקר · מוזיקה',
     pageUrl: 'https://glz.co.il/גלגלצ/תכניות/מדינה-בדרך-עם-הדר-מרקס',
   },
   {
-    id: 'glglz-poptalk',
-    name: 'פופטוק — גלגלצ',
-    sub: 'מה קורה במוזיקה ובתרבות · הפרק האחרון',
-    pageUrl: 'https://glz.co.il/גלגלצ/תכניות/פופטוק-עם-אחינעם-בר-ויסמין-ישבי',
+    id: 'kan88-dori-ben-zeev',
+    name: 'דורי בן זאב — כאן 88',
+    sub: 'תכנית הבוקר של 88 · מוזיקה',
+    pageUrl: 'https://www.kan.org.il/content/kan/kan-88/p-582004/',
+  },
+  {
+    id: 'kan88-reach-vinyl',
+    name: 'ריח ויניל — כאן 88',
+    sub: 'אורי בש ותקליטים · מוזיקה',
+    pageUrl: 'https://www.kan.org.il/content/kan/kan-88/p-9506/',
+  },
+  {
+    id: 'kan-gimel-tzohorayim',
+    name: 'צהריים של געגוע — כאן גימל',
+    sub: 'שירים ישראליים נוסטלגיים · מוזיקה',
+    pageUrl: 'https://www.kan.org.il/content/kan/kan-gimel/p-9162/',
+  },
+  {
+    id: 'kan-gimel-perek',
+    name: 'פרק גימל — כאן גימל',
+    sub: 'מוזיקה ישראלית · מוזיקה',
+    pageUrl: 'https://www.kan.org.il/content/kan/kan-gimel/p-8940/',
+  },
+  {
+    id: 'glz-boker-tov-israel',
+    name: 'בוקר טוב ישראל — גלי צה"ל',
+    sub: 'תכנית הבוקר · אקטואליה',
+    pageUrl: 'https://glz.co.il/גלצ/תוכניות/בוקר-טוב-ישראל',
+  },
+  {
+    id: 'glz-hamesh-baerev',
+    name: 'חמש בערב — גלי צה"ל',
+    sub: 'סיכום היום · אקטואליה',
+    pageUrl: 'https://glz.co.il/גלצ/תוכניות/חמש-בערב',
   },
   {
     id: 'radius100-ele-hayu',
     name: 'אלה היו הימים — רדיוס 100FM',
-    sub: 'שירים שחוזרים אחורה בזמן · הפרק האחרון',
+    sub: 'שירים שחוזרים אחורה בזמן · מוזיקה',
     pageUrl: 'https://www.100fm.co.il/program/אלה-היו-הימים/',
-  },
-  {
-    id: 'radius100-makshivim',
-    name: 'מקשיבים לכם — רדיוס 100FM',
-    sub: 'הפרק האחרון',
-    pageUrl: 'https://www.100fm.co.il/program/מקשיבים-לכם/',
+    latestFromHtml: true, // read the episode list from the page itself (its play button starts the live stream)
   },
   {
     id: 'radius100-vip',
     name: 'V.I.P — רדיוס 100FM',
-    sub: 'אורחים ומוזיקה · הפרק האחרון',
+    sub: 'אורחים ומוזיקה · מוזיקה',
     pageUrl: 'https://www.100fm.co.il/program/vip/',
-  },
-  {
-    id: 'radius100-tomer-maizner',
-    name: 'Tomer Maizner — רדיוס 100FM',
-    sub: 'סט מוזיקה אלקטרונית · הפרק האחרון',
-    pageUrl: 'https://www.100fm.co.il/program/tomer-maizner/',
+    latestFromHtml: true, // read the episode list from the page itself (its play button starts the live stream)
   },
 ];
 let lastContentItem = null; // replayed by the ▶ נגן button
@@ -1015,6 +1029,36 @@ function renderContentTab(){
   }
 }
 
+// Content items must play an episode, never a station's live stream.
+const LIVE_AUDIO_RE = /icecast|livestream|live-redirect|\/live(hls)?\/|\.livx|streamtheworld|glzwizzlv|\/live[_-]|_(mp3|aac)$|\/stream\/[^\/.]*\/?$/i;
+function isLiveAudio(url){
+  return LIVE_AUDIO_RE.test(url) || RAW_STATIONS.some(st => st.streamUrl === url);
+}
+
+// Newest audio file listed in the page's HTML (100FM lists its episodes as
+// .../wp-content/uploads/YYYY/MM/<file>.mp3, newest first).
+async function latestAudioFromHtml(pageUrl){
+  if(!window.electronAPI || !window.electronAPI.fetchRaw) return null;
+  try{
+    const r = await window.electronAPI.fetchRaw(pageUrl);
+    if(!r || !r.ok || !r.text) return null;
+    const html = r.text.replace(/\\\//g, '/');
+    const urls = [...new Set(html.match(/https?:\/\/[^"'\s<>()]+?\.(mp3|m4a|aac)(?=["'\s<>?)])/gi) || [])]
+      .filter(u => !isLiveAudio(u));
+    if(!urls.length) return null;
+    const month = u => { const m = u.match(/\/(20\d\d)\/(\d\d)\//); return m ? (+m[1]) * 12 + (+m[2]) : 0; };
+    return urls.map((u, i) => ({ u, i, m: month(u) }))
+      .sort((a, b) => b.m - a.m || a.i - b.i)[0].u;
+  }catch(e){ return null; }
+}
+
+async function resolveContentAudio(item){
+  let url = item.latestFromHtml ? await latestAudioFromHtml(item.pageUrl) : null;
+  if(!url) url = await window.electronAPI.scrapePageAudio(item.pageUrl);
+  if(url && isLiveAudio(url)) return { live: true };
+  return { url };
+}
+
 async function playContentItem(item, tile){
   if(!window.electronAPI || !window.electronAPI.scrapePageAudio){
     setStatus('תוכן נבחר זמין רק באפליקציה (Windows / Android).');
@@ -1030,7 +1074,13 @@ async function playContentItem(item, tile){
   setStatus('מאתר קובץ שמע...');
   playStaticNoise(350);
 
-  const audioUrl = await window.electronAPI.scrapePageAudio(item.pageUrl);
+  const found = await resolveContentAudio(item);
+  if(lastContentItem !== item || currentIndex !== -1) return; // something else was chosen meanwhile
+  if(found.live){
+    setStatus('נמצא רק השידור החי של התחנה — הפרק לא זמין כרגע.');
+    return;
+  }
+  const audioUrl = found.url;
   if(!audioUrl){
     setStatus('לא נמצא קובץ שמע בעמוד הזה.');
     return;
