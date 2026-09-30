@@ -2,6 +2,9 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
+<!-- This site is hosted on Netlify. Anyone can build and deploy a site
+     like this one for free: https://netlify.new/?utm_campaign=loops&utm_source=ai-legible&utm_medium=owned&utm_content=comment&utm_id=3d11bee9-44c9-4da3-a6a1-e819213dae92
+     Netlify hosting facts for this site: static/SSR served via Netlify Edge. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>רדיו רכב · ישראל</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -444,6 +447,7 @@
   <div class="tabs">
     <button class="tab-btn active" id="tabAll">כל התחנות</button>
     <button class="tab-btn" id="tabFav">מועדפות</button>
+    <button class="tab-btn" id="tabContent">תוכן נבחר מהרדיו</button>
   </div>
 
   <div class="presets" id="presets"></div>
@@ -455,11 +459,11 @@
 const STORAGE_KEY = 'il-radio-stations-v8';
 
 const RAW_STATIONS = [
-  {id:"kan-88",name:"כאן 88",streamUrl:"https://29073.live.streamtheworld.com/KAN_88.mp3",format:"mp3",nowPlaying:{method:"kan",channelId:4}},
-  {id:"kan-gimel",name:"כאן גימל",streamUrl:"https://27873.live.streamtheworld.com/KAN_GIMMEL.mp3",format:"mp3",nowPlaying:{method:"kan",channelId:9}},
+  {id:"kan-88",name:"כאן 88",streamUrl:"https://29073.live.streamtheworld.com/KAN_88.mp3",format:"mp3",nowPlaying:{method:"triton",mount:"KAN_88"}},
+  {id:"kan-gimel",name:"כאן גימל",streamUrl:"https://27873.live.streamtheworld.com/KAN_GIMMEL.mp3",format:"mp3",nowPlaying:{method:"triton",mount:"KAN_GIMMEL"}},
   {id:"kan-bet",name:"כאן ב",streamUrl:"https://28563.live.streamtheworld.com/KAN_BET.mp3",format:"mp3",nowPlaying:{method:"triton",mount:"KAN_BET"}},
   {id:"kan-tarbut",name:"כאן תרבות",streamUrl:"https://playerservices.streamtheworld.com/api/livestream-redirect/KAN_TARBUT.mp3",format:"mp3",nowPlaying:{method:"triton",mount:"KAN_TARBUT"}},
-  {id:"kan-kol-hamusica",name:"כאן קול המוסיקה",streamUrl:"https://kancdn.medonecdn.net/livehls/oil/kancdn-live/live/radio/kan_kol_hamusica/live.livx/playlist.m3u8?renditions",format:"hls",nowPlaying:{method:"kan",channelId:5}},
+  {id:"kan-kol-hamusica",name:"כאן קול המוסיקה",streamUrl:"https://kancdn.medonecdn.net/livehls/oil/kancdn-live/live/radio/kan_kol_hamusica/live.livx/playlist.m3u8?renditions",format:"hls"},
   {id:"kan-reka",name:"כאן רקע",streamUrl:"https://kancdn.medonecdn.net/livehls/oil/kancdn-live/live/radio/kan_reka/live.livx/playlist.m3u8?renditions",format:"hls"},
   {id:"galgalatz",name:"גלגלצ",streamUrl:"https://glzwizzlv.bynetcdn.com/glglz_mp3",format:"mp3",nowPlaying:{method:"glzpage",pageUrl:"https://glz.co.il/גלגלצ/"}},
   {id:"galei-tzahal",name:"גלי צה״ל",streamUrl:"https://glzwizzlv.bynetcdn.com/glz_mp3",format:"mp3",nowPlaying:{method:"glzpage",pageUrl:"https://glz.co.il/גלצ/"}},
@@ -494,11 +498,7 @@ function loadStations(){
       const saved = JSON.parse(raw);
       // merge: keep any user edits, but adopt new stations from RAW_STATIONS if list shape changed
       if(Array.isArray(saved) && saved.length === RAW_STATIONS.length){
-        // keep the user's edits/favorites, but always use the current now-playing settings
-        return saved.map(s => {
-          const raw = RAW_STATIONS.find(r => r.id === s.id);
-          return {favorite:false, ...s, nowPlaying: raw ? raw.nowPlaying : s.nowPlaying};
-        });
+        return saved.map(s => ({favorite:false, ...s}));
       }
     }
   }catch(e){}
@@ -509,8 +509,85 @@ function saveStations(list){
 }
 
 let stations = loadStations();
-let currentTab = 'all'; // 'all' | 'fav'
+let currentTab = 'all'; // 'all' | 'fav' | 'content'
 let dragSrcIndex = null;
+
+const CONTENT_ITEMS = [
+  {
+    id: 'glglz-chart',
+    name: 'המצעד השבועי — גלגלצ',
+    sub: 'הפרק העדכני, בהגשת דלית רצ\'שטר',
+    pageUrl: 'https://glz.co.il/גלגלצ/תכניות/המצעד-השבועי/המצעד-השבועי-עם-דלית-רצשטר-030926/',
+  },
+  {
+    id: 'radius100-minheret',
+    name: 'מנהרת הזמן — שירים שקטים',
+    sub: 'רדיוס 100FM',
+    pageUrl: 'https://www.100fm.co.il/program/מנהרת-הזמן/?audio=minheret-25-06-25',
+  },
+  // Program pages (not a single episode): each plays the program's latest episode.
+  {
+    id: 'glglz-kolot-hahayalim',
+    name: 'קולות החיילים — גלגלצ',
+    sub: 'השירים שבוחרות יחידות צה"ל · הפרק האחרון',
+    pageUrl: 'https://glz.co.il/גלגלצ/תכניות/קולות-החיילים',
+  },
+  {
+    id: 'glglz-kwami',
+    name: 'קוואמי — גלגלצ',
+    sub: 'מוזיקה חדשה והקצת אחרת · הפרק האחרון',
+    pageUrl: 'https://glz.co.il/גלגלצ/תכניות/קוואמי',
+  },
+  {
+    id: 'glglz-matan-levi',
+    name: 'מתן לוי — גלגלצ',
+    sub: 'מוזיקה · הפרק האחרון',
+    pageUrl: 'https://glz.co.il/גלגלצ/תכניות/מתן-לוי',
+  },
+  {
+    id: 'glglz-hadar-marks',
+    name: 'מדינה בדרך עם הדר מרקס — גלגלצ',
+    sub: 'שירים ושיחה על הבוקר · הפרק האחרון',
+    pageUrl: 'https://glz.co.il/גלגלצ/תכניות/מדינה-בדרך-עם-הדר-מרקס',
+  },
+  {
+    id: 'glglz-guri-alfi',
+    name: 'מדינה על הדרך עם גורי אלפי — גלגלצ',
+    sub: 'אורחים ומוזיקה לקראת הסופ"ש · הפרק האחרון',
+    pageUrl: 'https://glz.co.il/גלגלצ/תכניות/מדינה-על-הדרך-עם-גורי-אלפי',
+  },
+  {
+    id: 'glglz-poptalk',
+    name: 'פופטוק — גלגלצ',
+    sub: 'מה קורה במוזיקה ובתרבות · הפרק האחרון',
+    pageUrl: 'https://glz.co.il/גלגלצ/תכניות/פופטוק-עם-אחינעם-בר-ויסמין-ישבי',
+  },
+  {
+    id: 'glglz-best-in-world',
+    name: 'הכי טוב בעולם — גלגלצ',
+    sub: 'עומר גפן ומצעד בנושא משתנה · הפרק האחרון',
+    pageUrl: 'https://glz.co.il/גלגלצ/תכניות/הכי-טוב-בעולם',
+  },
+  {
+    id: 'kan88-yoav-yefet',
+    name: 'יואב יפת — כאן 88',
+    sub: 'מוזיקה · הפרק האחרון',
+    pageUrl: 'https://www.kan.org.il/content/kan/kan-88/p-9410/',
+  },
+  {
+    id: 'radius100-ele-hayu',
+    name: 'אלה היו הימים — רדיוס 100FM',
+    sub: 'שירים שחוזרים אחורה בזמן · הפרק האחרון',
+    pageUrl: 'https://www.100fm.co.il/program/אלה-היו-הימים/',
+  },
+  {
+    id: 'radius100-makshivim',
+    name: 'מקשיבים לכם — רדיוס 100FM',
+    sub: 'הפרק האחרון',
+    pageUrl: 'https://www.100fm.co.il/program/מקשיבים-לכם/',
+  },
+];
+let lastContentItem = null; // replayed by the ▶ נגן button
 let currentIndex = -1;
 let hls = null;
 let mediaRecorder = null;
@@ -534,19 +611,17 @@ const volUp = document.getElementById('volUp');
 const volDown = document.getElementById('volDown');
 const tabAll = document.getElementById('tabAll');
 const tabFav = document.getElementById('tabFav');
+const tabContent = document.getElementById('tabContent');
 
-tabAll.addEventListener('click', ()=>{
-  currentTab = 'all';
-  tabAll.classList.add('active');
-  tabFav.classList.remove('active');
+function setActiveTab(tab){
+  currentTab = tab;
+  [tabAll, tabFav, tabContent].forEach(b=>b.classList.remove('active'));
+  ({all:tabAll, fav:tabFav, content:tabContent})[tab].classList.add('active');
   render();
-});
-tabFav.addEventListener('click', ()=>{
-  currentTab = 'fav';
-  tabFav.classList.add('active');
-  tabAll.classList.remove('active');
-  render();
-});
+}
+tabAll.addEventListener('click', ()=> setActiveTab('all'));
+tabFav.addEventListener('click', ()=> setActiveTab('fav'));
+tabContent.addEventListener('click', ()=> setActiveTab('content'));
 
 function setStatus(text){ vfdStatus.textContent = text; }
 
@@ -591,6 +666,12 @@ function playStaticNoise(duration=350){
 /* ===== Presets ===== */
 function render(){
   presetsEl.innerHTML = '';
+
+  if(currentTab === 'content'){
+    renderContentTab();
+    return;
+  }
+
   const items = stations
     .map((st, realIndex) => ({st, realIndex}))
     .filter(({st}) => currentTab === 'all' || st.favorite);
@@ -781,18 +862,6 @@ function parseKanApi(json){
   return null;
 }
 
-// Kan (kan.org.il) live track API: {title, artists:[...], programData:{programName}}.
-// Empty response (HTTP 204) = no song right now (e.g. talk).
-function parseKanLive(text){
-  try{
-    const json = JSON.parse(text);
-    const artists = Array.isArray(json.artists) ? json.artists.filter(Boolean).join(', ') : '';
-    const song = [artists, json.title].filter(Boolean).join(' – ');
-    if(song) return song;
-    return (json.programData && json.programData.programName) || null;
-  }catch(e){ return null; }
-}
-
 function parseTritonXml(text){
   try{
     const doc = new DOMParser().parseFromString(text, 'text/xml');
@@ -821,7 +890,14 @@ async function fetchGlzPageNowPlaying(pageUrl){
   if(window.electronAPI && window.electronAPI.scrapeGlz){
     try{
       const val = await window.electronAPI.scrapeGlz(pageUrl);
-      if(val) return decodeHtmlEntities(val);
+      if(Array.isArray(val)){
+        // Temporary debug shape: log every candidate to the DevTools console (F12)
+        // so we can see which one is the song vs the programme name.
+        console.log('[glz now-playing candidates]', pageUrl, val);
+        if(val.length > 0) return val[0].value || null;
+      } else if(val){
+        return decodeHtmlEntities(val);
+      }
     }catch(e){ /* fall through */ }
   }
 
@@ -905,8 +981,6 @@ async function fetchNowPlaying(station){
 
   const url = np.method === 'triton'
     ? `https://np.tritondigital.com/public/nowplaying?mountName=${np.mount}&numberToFetch=1&eventType=track`
-    : np.method === 'kan'
-    ? `https://www.kan.org.il/api/arc-cloud/get-live-track-data?channelId=${np.channelId}`
     : np.url;
   if(!url){ vfdSong.textContent = ''; return; }
   const text = await smartFetchText(url);
@@ -919,8 +993,6 @@ async function fetchNowPlaying(station){
       label = parseKanApi(JSON.parse(text));
     } else if(np.method === 'triton'){
       label = parseTritonXml(text);
-    } else if(np.method === 'kan'){
-      label = parseKanLive(text);
     }
   }catch(e){ label = null; }
   vfdSong.textContent = label || '';
@@ -933,6 +1005,63 @@ function startNowPlaying(station){
   nowPlayingTimer = setInterval(()=> fetchNowPlaying(station), 25000);
 }
 
+
+function renderContentTab(){
+  const hint = document.createElement('div');
+  hint.style.cssText = 'color:var(--vfd-amber);font-size:13px;font-weight:700;padding:4px 4px 8px;grid-column:1/-1;';
+  hint.textContent = 'בחרו תוכן מהרשימה ולחצו ▶ נגן. איתור הפרק לוקח כמה שניות.';
+  presetsEl.appendChild(hint);
+  CONTENT_ITEMS.forEach((item)=>{
+    const tile = document.createElement('div');
+    tile.className = 'preset';
+    tile.tabIndex = 0;
+    tile.innerHTML = `
+      <div class="preset-top">
+        <span class="preset-num vfd-font">▶</span>
+        <span class="preset-led" id="content-led-${item.id}"></span>
+      </div>
+      <div class="preset-name">${item.name}</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">${item.sub}</div>
+    `;
+    tile.addEventListener('click', ()=> playContentItem(item, tile));
+    presetsEl.appendChild(tile);
+  });
+  if(!window.electronAPI || !window.electronAPI.scrapePageAudio){
+    const note = document.createElement('div');
+    note.style.cssText = 'color:var(--text-dim);font-size:12px;padding:8px 4px;grid-column:1/-1;';
+    note.textContent = 'ניגון תוכן נבחר זמין רק באפליקציה (Windows / Android) — לא בדפדפן רגיל.';
+    presetsEl.appendChild(note);
+  }
+}
+
+async function playContentItem(item, tile){
+  if(!window.electronAPI || !window.electronAPI.scrapePageAudio){
+    setStatus('תוכן נבחר זמין רק באפליקציה (Windows / Android).');
+    return;
+  }
+  lastContentItem = item;
+  stopRecordingIfActive();
+  if(hls){ hls.destroy(); hls = null; }
+  clearNowPlaying();
+  currentIndex = -1;
+  vfdName.textContent = item.name;
+  vfdSong.textContent = '';
+  setStatus('מאתר קובץ שמע...');
+  playStaticNoise(350);
+
+  const audioUrl = await window.electronAPI.scrapePageAudio(item.pageUrl);
+  if(!audioUrl){
+    setStatus('לא נמצא קובץ שמע בעמוד הזה.');
+    return;
+  }
+  player.src = audioUrl;
+  player.volume = volume;
+  player.play().then(()=>{
+    setStatus('מתנגן: ' + item.name);
+  }).catch(()=>{
+    setStatus('נמצאה כתובת אך הניגון נכשל.');
+  });
+}
 
 function selectStation(i){
   const st = stations[i];
@@ -969,7 +1098,8 @@ function selectStation(i){
 }
 
 playBtn.addEventListener('click',()=>{
-  if(currentIndex===-1){ setStatus('בחרו תחנה מהרשימה.'); return; }
+  if(currentIndex===-1 && lastContentItem){ playContentItem(lastContentItem); return; }
+  if(currentIndex===-1 && !player.src){ setStatus('בחרו תחנה מהרשימה.'); return; }
   player.play().catch(()=>{});
 });
 stopBtn.addEventListener('click',()=>{
@@ -1015,7 +1145,7 @@ function stopRecordingIfActive(){
   if(mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop();
 }
 recBtn.addEventListener('click',()=>{
-  if(currentIndex===-1){ setStatus('בחרו והפעילו תחנה קודם.'); return; }
+  if(currentIndex===-1 && !player.src){ setStatus('בחרו והפעילו תחנה קודם.'); return; }
   if(mediaRecorder && mediaRecorder.state==='recording'){ mediaRecorder.stop(); return; }
   startRecording();
 });
@@ -1040,7 +1170,7 @@ function startRecording(){
     const blob = new Blob(recChunks,{type:mediaRecorder.mimeType||'audio/webm'});
     const url = URL.createObjectURL(blob);
     const stamp = new Date().toISOString().replace(/[:.]/g,'-');
-    const name = stations[currentIndex] ? stations[currentIndex].name : 'הקלטה';
+    const name = stations[currentIndex] ? stations[currentIndex].name : (vfdName.textContent || 'הקלטה');
     const a=document.createElement('a');
     a.href=url; a.download=`${name}_${stamp}.webm`;
     document.body.appendChild(a); a.click(); a.remove();
@@ -1065,3 +1195,4 @@ render();
 </script>
 </body>
 </html>
+<script async src="/.netlify/scripts/hud?variant=public" data-nf-variant="public" data-netlify-site-id="3d11bee9-44c9-4da3-a6a1-e819213dae92" data-app-host="app.netlify.com"></script>
