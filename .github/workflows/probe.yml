@@ -11,5 +11,5 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm ci
-      - run: xvfb-run -a npx electron --no-sandbox .github/probe/verify.js 2>&1 | grep -E "^(OK|FAIL)"
+      - run: xvfb-run -a npx electron --no-sandbox .github/probe/verify.js 2>&1 | grep --line-buffered -E "^(START|OK|FAIL)"
         timeout-minutes: 15
