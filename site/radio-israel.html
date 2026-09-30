@@ -539,40 +539,16 @@ const CONTENT_ITEMS = [
     pageUrl: 'https://glz.co.il/גלגלצ/תכניות/קוואמי',
   },
   {
-    id: 'glglz-matan-levi',
-    name: 'מתן לוי — גלגלצ',
-    sub: 'מוזיקה · הפרק האחרון',
-    pageUrl: 'https://glz.co.il/גלגלצ/תכניות/מתן-לוי',
-  },
-  {
     id: 'glglz-hadar-marks',
     name: 'מדינה בדרך עם הדר מרקס — גלגלצ',
     sub: 'שירים ושיחה על הבוקר · הפרק האחרון',
     pageUrl: 'https://glz.co.il/גלגלצ/תכניות/מדינה-בדרך-עם-הדר-מרקס',
   },
   {
-    id: 'glglz-guri-alfi',
-    name: 'מדינה על הדרך עם גורי אלפי — גלגלצ',
-    sub: 'אורחים ומוזיקה לקראת הסופ"ש · הפרק האחרון',
-    pageUrl: 'https://glz.co.il/גלגלצ/תכניות/מדינה-על-הדרך-עם-גורי-אלפי',
-  },
-  {
     id: 'glglz-poptalk',
     name: 'פופטוק — גלגלצ',
     sub: 'מה קורה במוזיקה ובתרבות · הפרק האחרון',
     pageUrl: 'https://glz.co.il/גלגלצ/תכניות/פופטוק-עם-אחינעם-בר-ויסמין-ישבי',
-  },
-  {
-    id: 'glglz-best-in-world',
-    name: 'הכי טוב בעולם — גלגלצ',
-    sub: 'עומר גפן ומצעד בנושא משתנה · הפרק האחרון',
-    pageUrl: 'https://glz.co.il/גלגלצ/תכניות/הכי-טוב-בעולם',
-  },
-  {
-    id: 'kan88-yoav-yefet',
-    name: 'יואב יפת — כאן 88',
-    sub: 'מוזיקה · הפרק האחרון',
-    pageUrl: 'https://www.kan.org.il/content/kan/kan-88/p-9410/',
   },
   {
     id: 'radius100-ele-hayu',
@@ -585,6 +561,18 @@ const CONTENT_ITEMS = [
     name: 'מקשיבים לכם — רדיוס 100FM',
     sub: 'הפרק האחרון',
     pageUrl: 'https://www.100fm.co.il/program/מקשיבים-לכם/',
+  },
+  {
+    id: 'radius100-vip',
+    name: 'V.I.P — רדיוס 100FM',
+    sub: 'אורחים ומוזיקה · הפרק האחרון',
+    pageUrl: 'https://www.100fm.co.il/program/vip/',
+  },
+  {
+    id: 'radius100-tomer-maizner',
+    name: 'Tomer Maizner — רדיוס 100FM',
+    sub: 'סט מוזיקה אלקטרונית · הפרק האחרון',
+    pageUrl: 'https://www.100fm.co.il/program/tomer-maizner/',
   },
 ];
 let lastContentItem = null; // replayed by the ▶ נגן button
@@ -890,14 +878,7 @@ async function fetchGlzPageNowPlaying(pageUrl){
   if(window.electronAPI && window.electronAPI.scrapeGlz){
     try{
       const val = await window.electronAPI.scrapeGlz(pageUrl);
-      if(Array.isArray(val)){
-        // Temporary debug shape: log every candidate to the DevTools console (F12)
-        // so we can see which one is the song vs the programme name.
-        console.log('[glz now-playing candidates]', pageUrl, val);
-        if(val.length > 0) return val[0].value || null;
-      } else if(val){
-        return decodeHtmlEntities(val);
-      }
+      if(val) return decodeHtmlEntities(val);
     }catch(e){ /* fall through */ }
   }
 
