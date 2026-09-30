@@ -17,7 +17,7 @@ app.whenReady().then(async () => {
   const ids = await site.webContents.executeJavaScript(code);
   const probe = new BrowserWindow({ show: false, webPreferences: { sandbox: true, autoplayPolicy: 'no-user-gesture-required' } });
   await probe.loadURL('https://shay-radio-il.netlify.app/');
-  const order = ['glglz-hadar-marks', 'glglz-hadar-marks', 'glglz-hadar-marks', ...ids.filter((i) => i !== 'glglz-hadar-marks')];
+  const order = ['glglz-kwami', 'glglz-kwami', ...ids];
   for (const id of order) {
     const t0 = Date.now();
     const r = await withTimeout(site.webContents.executeJavaScript(`__T.resolveContentAudio(__T.CONTENT_ITEMS.find(i => i.id === ${JSON.stringify(id)}))`).catch((e) => ({ err: e.message })), 120000);
