@@ -198,13 +198,6 @@
     transform:translateY(3px);
     box-shadow:0 0 0 #17171a, inset 0 2px 6px rgba(0,0,0,.6);
   }
-  .btn-transport.rec{ color:#3a1210; }
-  .btn-transport.rec.active{
-    background:linear-gradient(180deg,#e6392c,#a8281e);
-    color:#fff;
-    animation:recblink 1s ease-in-out infinite;
-  }
-  @keyframes recblink{0%,100%{box-shadow:0 3px 0 #17171a,0 0 14px 4px rgba(230,57,44,.7);}50%{box-shadow:0 3px 0 #17171a,0 0 2px 1px rgba(230,57,44,.3);}}
   .transport-label{
     font-size:10px;
     color:var(--text-dim);
@@ -430,10 +423,6 @@
       <button class="btn-transport" id="stopBtn" title="עצור">■</button>
       <div class="transport-label">עצור</div>
     </div>
-    <div class="transport-col">
-      <button class="btn-transport rec" id="recBtn" title="הקלט">⏺</button>
-      <div class="transport-label" id="recLabel">הקלט</div>
-    </div>
     <div class="knob-wrap">
       <div class="knob-row">
         <button class="vol-btn" id="volDown" title="החלש">－</button>
@@ -592,10 +581,6 @@ const CONTENT_ITEMS = [
 let lastContentItem = null; // replayed by the ▶ נגן button
 let currentIndex = -1;
 let hls = null;
-let mediaRecorder = null;
-let recChunks = [];
-let recStart = 0;
-let recTimerId = null;
 let volume = 0.85;
 
 const presetsEl = document.getElementById('presets');
@@ -604,8 +589,6 @@ const vfdName = document.getElementById('vfdName');
 const vfdStatus = document.getElementById('vfdStatus');
 const playBtn = document.getElementById('playBtn');
 const stopBtn = document.getElementById('stopBtn');
-const recBtn = document.getElementById('recBtn');
-const recLabel = document.getElementById('recLabel');
 const needle = document.getElementById('needle');
 const dial = document.getElementById('dial');
 const volKnob = document.getElementById('volKnob');
@@ -1087,7 +1070,6 @@ async function playContentItem(item, tile){
     return;
   }
   lastContentItem = item;
-  stopRecordingIfActive();
   if(hls){ hls.destroy(); hls = null; }
   clearNowPlaying();
   currentIndex = -1;
@@ -1125,7 +1107,6 @@ function selectStation(i){
   if(!st.url){ setStatus('אין כתובת שידור — לחצו על ✎ כדי להוסיף.'); return; }
 
   playStaticNoise(350);
-  stopRecordingIfActive();
   if(hls){ hls.destroy(); hls=null; }
 
   currentIndex = i;
@@ -1190,55 +1171,6 @@ volKnob.addEventListener('pointerup',()=> knobDragging=false);
 volUp.addEventListener('click', ()=> applyVolume(volume + 0.07));
 volDown.addEventListener('click', ()=> applyVolume(volume - 0.07));
 applyVolume(volume);
-
-/* ===== Recording ===== */
-function updateRecTime(){
-  const secs = Math.floor((Date.now()-recStart)/1000);
-  const m=String(Math.floor(secs/60)).padStart(2,'0');
-  const s=String(secs%60).padStart(2,'0');
-  recLabel.textContent = m+':'+s;
-}
-function stopRecordingIfActive(){
-  if(mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop();
-}
-recBtn.addEventListener('click',()=>{
-  if(currentIndex===-1 && !player.src){ setStatus('בחרו והפעילו תחנה קודם.'); return; }
-  if(mediaRecorder && mediaRecorder.state==='recording'){ mediaRecorder.stop(); return; }
-  startRecording();
-});
-function startRecording(){
-  let stream;
-  try{ stream = player.captureStream ? player.captureStream() : player.mozCaptureStream(); }
-  catch(e){ setStatus('הדפדפן חוסם הקלטה של שידור זה.'); return; }
-  if(!stream || stream.getAudioTracks().length===0){ setStatus('אין ערוץ שמע להקלטה.'); return; }
-  let mimeType='audio/webm';
-  if(!MediaRecorder.isTypeSupported(mimeType)) mimeType='';
-  try{ mediaRecorder = new MediaRecorder(stream, mimeType?{mimeType}:undefined); }
-  catch(e){ setStatus('לא ניתן להקליט בדפדפן זה.'); return; }
-  recChunks=[];
-  mediaRecorder.ondataavailable=(e)=>{ if(e.data && e.data.size>0) recChunks.push(e.data); };
-  mediaRecorder.onerror=()=>{
-    setStatus('ההקלטה נכשלה (חסימת CORS מהשרת).');
-    clearInterval(recTimerId); recBtn.classList.remove('active'); recLabel.textContent='הקלט';
-  };
-  mediaRecorder.onstop=()=>{
-    clearInterval(recTimerId); recBtn.classList.remove('active'); recLabel.textContent='הקלט';
-    if(recChunks.length===0) return;
-    const blob = new Blob(recChunks,{type:mediaRecorder.mimeType||'audio/webm'});
-    const url = URL.createObjectURL(blob);
-    const stamp = new Date().toISOString().replace(/[:.]/g,'-');
-    const name = stations[currentIndex] ? stations[currentIndex].name : (vfdName.textContent || 'הקלטה');
-    const a=document.createElement('a');
-    a.href=url; a.download=`${name}_${stamp}.webm`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),4000);
-    setStatus('ההקלטה נשמרה למכשיר.');
-  };
-  mediaRecorder.start();
-  recStart = Date.now();
-  recBtn.classList.add('active');
-  recTimerId = setInterval(updateRecTime,500);
-}
 
 /* ===== Clock ===== */
 function tickClock(){
