@@ -1052,11 +1052,33 @@ async function latestAudioFromHtml(pageUrl){
   }catch(e){ return null; }
 }
 
+// A station's page can link an episode its server no longer has (404).
+// fetchRaw stops after 2 MB, so a real audio file comes back as "too large" (status 0).
+async function audioExists(url){
+  if(!window.electronAPI || !window.electronAPI.fetchRaw) return true;
+  try{
+    const r = await window.electronAPI.fetchRaw(url);
+    return !(r && r.status >= 400);
+  }catch(e){ return true; }
+}
+
+// Finds the item's episode; skips live streams and episodes that no longer exist.
+// Each search of the page can land on a different episode, so try a few times.
 async function resolveContentAudio(item){
-  let url = item.latestFromHtml ? await latestAudioFromHtml(item.pageUrl) : null;
-  if(!url) url = await window.electronAPI.scrapePageAudio(item.pageUrl);
-  if(url && isLiveAudio(url)) return { live: true };
-  return { url };
+  const tried = new Set();
+  let live = false;
+  for(let attempt = 0; attempt < 3; attempt++){
+    let url = (attempt === 0 && item.latestFromHtml) ? await latestAudioFromHtml(item.pageUrl) : null;
+    if(!url) url = await window.electronAPI.scrapePageAudio(item.pageUrl);
+    if(!url) break;
+    if(isLiveAudio(url)){ live = true; continue; }
+    if(tried.has(url)) continue;
+    tried.add(url);
+    if(await audioExists(url)) return { url };
+    if(lastContentItem === item) setStatus('הפרק האחרון לא זמין באתר התחנה — מחפש פרק אחר...');
+  }
+  if(tried.size) return { missing: true };
+  return live ? { live: true } : {};
 }
 
 async function playContentItem(item, tile){
@@ -1076,6 +1098,10 @@ async function playContentItem(item, tile){
 
   const found = await resolveContentAudio(item);
   if(lastContentItem !== item || currentIndex !== -1) return; // something else was chosen meanwhile
+  if(found.missing){
+    setStatus('הפרק לא זמין כרגע באתר התחנה — נסו שוב מאוחר יותר.');
+    return;
+  }
   if(found.live){
     setStatus('נמצא רק השידור החי של התחנה — הפרק לא זמין כרגע.');
     return;

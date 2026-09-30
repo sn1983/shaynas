@@ -1,4 +1,4 @@
-name: Probe glz episode (temporary)
+name: Verify content items play (temporary)
 on:
   push:
     branches: [claude/electron-shay-radio-app-8klop2]
@@ -12,4 +12,4 @@ jobs:
         with: { node-version: 22 }
       - run: npm ci
       - run: xvfb-run -a npx electron --no-sandbox .github/probe/glz.js 2>&1 | grep --line-buffered '^RES' | cut -c1-400
-        timeout-minutes: 10
+        timeout-minutes: 20
