@@ -11,8 +11,8 @@ Approved style frame (the reference for all shots): MAHZA6lXakE
 | 5 | Bouncing off a shop awning | done | MAHZA0BeV3w |
 | 6 | Weaving through the traffic jam | done | MAHZA6T48Go |
 | 7 | Sliding across a taxi's hood | done | MAHZA5t2BX4 |
-| 8 | Arriving at the school polling station | pending | |
-| 9 | The envelope into the ballot box | pending | |
+| 8 | Arriving at the school polling station | done | MAHZA7jiVSc |
+| 9 | The envelope into the ballot box | done | MAHZA4CBPxc |
 | 10 | Ending: points at the camera, space for the text at the top | pending | |
 
 Prompts for the remaining shots (each with the reference MAHZA6lXakE):
