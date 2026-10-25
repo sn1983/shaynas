@@ -13,7 +13,7 @@ Approved style frame (the reference for all shots): MAHZA6lXakE
 | 7 | Sliding across a taxi's hood | done | MAHZA5t2BX4 |
 | 8 | Arriving at the school polling station | done | MAHZA7jiVSc |
 | 9 | The envelope into the ballot box | done | MAHZA4CBPxc |
-| 10 | Ending: points at the camera, space for the text at the top | pending | |
+| 10 | Ending: points at the camera, space for the text at the top | done | MAHZAyzB4wM |
 
 Prompts for the remaining shots (each with the reference MAHZA6lXakE):
 
