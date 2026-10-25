@@ -1,0 +1,59 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #000; }
+    #root .lay { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+    #root .lay img { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+  </style>
+  <div id="root" data-composition-id="a10" data-start="0" data-duration="3.6" data-width="1080" data-height="1920">
+    <div id="a10-world" class="lay">
+      <div id="a10-bg" class="lay"><img src="assets/layers/10_bg.jpg" alt="" /></div>
+      <div id="a10-hero" class="lay"><div id="a10-heroin" class="lay">
+          <div id="a10-body" class="lay"><img src="assets/layers/10_hero.png" alt="" /></div>
+      <div id="a10-head" class="lay"><img src="assets/layers/10_head.png" alt="" /></div>
+      <div id="a10-point" class="lay"><img src="assets/layers/10_point.png" alt="" /></div>
+      </div></div>
+    </div>
+  </div>
+  <script>
+    const D = 3.6;
+
+    const tl = gsap.timeline({ paused: true });
+    function rng(seed) { let a = seed; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+    // up-down bob, two footfalls per stride
+    function bob(sel, t0, t1, amp, period) {
+      for (let t = t0; t < t1 - 0.001; t += period / 2) {
+        tl.to(sel, { y: -amp, duration: period / 4, ease: "sine.out" }, t);
+        tl.to(sel, { y: 0, duration: period / 4, ease: "sine.in" }, t + period / 4);
+      }
+    }
+    // alternating rotation around an origin (arm swing, body sway)
+    function swing(sel, origin, t0, t1, deg, period, phase = 1) {
+      let i = 0;
+      for (let t = t0; t < t1 - 0.001; t += period / 2, i++) {
+        tl.to(sel, { rotation: (i % 2 ? 1 : -1) * deg * phase, transformOrigin: origin, duration: period / 2, ease: "sine.inOut" }, t);
+      }
+    }
+    // seeded nervous jitter
+    function jitter(sel, t0, t1, amp, seed, rot = 0) {
+      const r = rng(seed);
+      for (let t = t0; t < t1 - 0.001; t += 1 / 15) {
+        tl.to(sel, { x: (r() - 0.5) * amp, y: (r() - 0.5) * amp, rotation: (r() - 0.5) * rot, duration: 1 / 15, ease: "sine.inOut" }, t);
+      }
+      tl.to(sel, { x: 0, y: 0, rotation: 0, duration: 0.1 }, t1 - 0.1);
+    }
+
+
+    tl.fromTo("#a10-world", { scale: 1.16, y: 50, transformOrigin: "50% 60%" }, { scale: 1.04, y: 0, duration: 0.6, ease: "expo.out" }, 0);
+    tl.to("#a10-world", { scale: 1.02, duration: D - 0.6, ease: "none" }, 0.6);
+    // head: a confident tilt, then a nod on "צאו להצביע"
+    tl.fromTo("#a10-head img", { rotation: 0, transformOrigin: "620px 1120px" }, { rotation: -4, duration: 0.5, ease: "sine.inOut" }, 0.2);
+    tl.to("#a10-head img", { rotation: 3, duration: 0.25, ease: "power2.out" }, 1.35);
+    tl.to("#a10-head img", { rotation: 0, duration: 0.6, ease: "sine.inOut" }, 1.6);
+    // the point: a punch toward the lens on the call to action
+    tl.fromTo("#a10-point img", { scale: 1, rotation: 0, transformOrigin: "360px 1240px" }, { scale: 1.12, rotation: -3, duration: 0.18, ease: "power3.out" }, 1.38);
+    tl.to("#a10-point img", { scale: 1.04, rotation: 0, duration: 0.5, ease: "elastic.out(1, 0.5)" }, 1.56);
+    swing("#a10-heroin", "651px 1919px", 0, D, 1.2, 1.8);
+    
+    window.__timelines["a10"] = tl;
+  </script>
+</template>

@@ -1,0 +1,62 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #000; }
+    #root .lay { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+    #root .lay img { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+  </style>
+  <div id="root" data-composition-id="a9" data-start="0" data-duration="3.2" data-width="1080" data-height="1920">
+    <div id="a9-world" class="lay">
+      <div id="a9-bg" class="lay"><img src="assets/layers/9_bg.jpg" alt="" /></div>
+      <div id="a9-p0" class="lay"><img src="assets/layers/9_p0.png" alt="" /></div>
+      <div id="a9-env" class="lay"><img src="assets/layers/9_env.png" alt="" /></div>
+      <div id="a9-hero" class="lay"><div id="a9-heroin" class="lay">
+          <div id="a9-body" class="lay"><img src="assets/layers/9_hero.png" alt="" /></div>
+      <div id="a9-arm" class="lay"><img src="assets/layers/9_arm.png" alt="" /></div>
+      </div></div>
+      <div id="a9-box" class="lay"><img src="assets/layers/9_box.png" alt="" /></div>
+    </div>
+  </div>
+  <script>
+    const D = 3.2;
+
+    const tl = gsap.timeline({ paused: true });
+    function rng(seed) { let a = seed; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+    // up-down bob, two footfalls per stride
+    function bob(sel, t0, t1, amp, period) {
+      for (let t = t0; t < t1 - 0.001; t += period / 2) {
+        tl.to(sel, { y: -amp, duration: period / 4, ease: "sine.out" }, t);
+        tl.to(sel, { y: 0, duration: period / 4, ease: "sine.in" }, t + period / 4);
+      }
+    }
+    // alternating rotation around an origin (arm swing, body sway)
+    function swing(sel, origin, t0, t1, deg, period, phase = 1) {
+      let i = 0;
+      for (let t = t0; t < t1 - 0.001; t += period / 2, i++) {
+        tl.to(sel, { rotation: (i % 2 ? 1 : -1) * deg * phase, transformOrigin: origin, duration: period / 2, ease: "sine.inOut" }, t);
+      }
+    }
+    // seeded nervous jitter
+    function jitter(sel, t0, t1, amp, seed, rot = 0) {
+      const r = rng(seed);
+      for (let t = t0; t < t1 - 0.001; t += 1 / 15) {
+        tl.to(sel, { x: (r() - 0.5) * amp, y: (r() - 0.5) * amp, rotation: (r() - 0.5) * rot, duration: 1 / 15, ease: "sine.inOut" }, t);
+      }
+      tl.to(sel, { x: 0, y: 0, rotation: 0, duration: 0.1 }, t1 - 0.1);
+    }
+
+
+    tl.fromTo("#a9-world", { scale: 1.04, transformOrigin: "45% 60%" }, { scale: 1.14, duration: D, ease: "power1.inOut" }, 0);
+    // the hand pushes the envelope down; the envelope slides into the slot
+    tl.fromTo("#a9-arm", { y: 0 }, { y: 46, duration: 0.8, ease: "power2.inOut" }, 0.5);
+    tl.fromTo("#a9-env", { y: 0 }, { y: 46, duration: 0.8, ease: "power2.inOut" }, 0.5);
+    tl.to("#a9-arm", { y: 26, duration: 0.6, ease: "power2.out" }, 1.4);
+    tl.fromTo("#a9-hero", { rotation: 0, transformOrigin: "284px 1600px" }, { rotation: 1.5, duration: 0.8, ease: "sine.inOut" }, 0.5);
+    tl.to("#a9-hero", { rotation: -1, duration: 1.2, ease: "sine.inOut" }, 1.4);
+    // the committee lights up when the envelope drops in
+    tl.fromTo("#a9-p0", { y: 0 }, { y: -12, duration: 0.18, ease: "power2.out" }, 1.65);
+    tl.to("#a9-p0", { y: 0, duration: 0.3, ease: "bounce.out" }, 1.83);
+    swing("#a9-p0 img", "826px 1107px", 0, D, 1.2, 1.4);
+    
+    window.__timelines["a9"] = tl;
+  </script>
+</template>

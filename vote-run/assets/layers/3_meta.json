@@ -1,0 +1,69 @@
+{
+ "people": [
+  {
+   "name": "p0",
+   "feet": [
+    860,
+    1853
+   ],
+   "box": [
+    610,
+    880,
+    1066,
+    1853
+   ]
+  }
+ ],
+ "parts": [
+  {
+   "name": "armA",
+   "pivot": [
+    300,
+    350
+   ],
+   "z": "back"
+  },
+  {
+   "name": "armB",
+   "pivot": [
+    700,
+    460
+   ],
+   "z": "front"
+  },
+  {
+   "name": "orange",
+   "pivot": [
+    792,
+    1592
+   ],
+   "z": "world_front",
+   "src": "image"
+  },
+  {
+   "name": "apple",
+   "pivot": [
+    546,
+    1210
+   ],
+   "z": "world_front",
+   "src": "image"
+  }
+ ],
+ "hero": {
+  "feet": [
+   444,
+   1089
+  ],
+  "center": [
+   444,
+   575
+  ],
+  "box": [
+   112,
+   76,
+   811,
+   1089
+  ]
+ }
+}

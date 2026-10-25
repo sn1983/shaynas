@@ -1,0 +1,19 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; pointer-events: none; }
+    #fx-flash { position: absolute; inset: 0; background: #fff8e6; opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="fx" data-start="0" data-duration="30" data-width="1080" data-height="1920">
+    <div id="fx-flash" class="clip" data-start="0" data-duration="30" data-layout-ignore></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.set("#fx-flash", { opacity: 0 }, 0);
+    // the rooftop landing and the end card land on a flash
+    tl.set("#fx-flash", { opacity: 0.85 }, 11.2);
+    tl.to("#fx-flash", { opacity: 0, duration: 0.3, ease: "power2.out" }, 11.2);
+    tl.set("#fx-flash", { opacity: 0.7 }, 26.4);
+    tl.to("#fx-flash", { opacity: 0, duration: 0.35, ease: "power2.out" }, 26.4);
+    window.__timelines["fx"] = tl;
+  </script>
+</template>
