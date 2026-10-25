@@ -9,8 +9,8 @@ Approved style frame (the reference for all shots): MAHZA6lXakE
 | 3 | Hurdling the fruit crates, shopkeeper surprised | done | MAHZA9GxnF0 |
 | 4 | Leaping between rooftops | done | MAHZA3c5UNE |
 | 5 | Bouncing off a shop awning | done | MAHZA0BeV3w |
-| 6 | Weaving through the traffic jam | pending (Canva quota) | |
-| 7 | Sliding across a taxi's hood | pending | |
+| 6 | Weaving through the traffic jam | done | MAHZA6T48Go |
+| 7 | Sliding across a taxi's hood | done | MAHZA5t2BX4 |
 | 8 | Arriving at the school polling station | pending | |
 | 9 | The envelope into the ballot box | pending | |
 | 10 | Ending: points at the camera, space for the text at the top | pending | |
