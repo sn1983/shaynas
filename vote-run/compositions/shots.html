@@ -5,9 +5,12 @@
     .cam { position: absolute; inset: 0; will-change: transform; }
     .cam img { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; }
     #shots-flash { position: absolute; inset: 0; background: #fff8e6; opacity: 0; }
-    #shots-draft {
-      position: absolute; top: 176px; left: 40px; padding: 8px 18px 10px; border-radius: 12px;
-      background: rgba(10, 20, 50, 0.6); color: #fff; font: 700 30px "Rubik", sans-serif; direction: rtl;
+    @font-face { font-family: "Rubik"; font-weight: 900; src: url("assets/fonts/rubik-hebrew-900-normal.woff2") format("woff2"); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+    #s8-sign {
+      position: absolute; left: 160px; top: 110px; width: 720px; height: 350px;
+      display: flex; align-items: center; justify-content: center;
+      font: 900 200px/1 "Rubik", sans-serif; color: #0038b8; direction: rtl;
+      transform: rotate(1.2deg);
     }
   </style>
   <div id="root" data-composition-id="shots" data-start="0" data-duration="30" data-width="1080" data-height="1920">
@@ -33,7 +36,7 @@
       <div id="s7-cam" class="cam"><img id="s7-img" src="assets/shots/7.jpg" alt="" data-var-src="shot7" /></div>
     </div>
     <div id="s8" class="clip shot" data-start="20.8" data-duration="2.4" data-track-index="8">
-      <div id="s8-cam" class="cam"><img id="s8-img" src="assets/shots/8.jpg" alt="" data-var-src="shot8" /></div>
+      <div id="s8-cam" class="cam"><img id="s8-img" src="assets/shots/8.jpg" alt="" data-var-src="shot8" /><div id="s8-sign">קלפי</div></div>
     </div>
     <div id="s9" class="clip shot" data-start="23.2" data-duration="3.2" data-track-index="9">
       <div id="s9-cam" class="cam"><img id="s9-img" src="assets/shots/9.jpg" alt="" data-var-src="shot9" /></div>
@@ -42,7 +45,6 @@
       <div id="s10-cam" class="cam"><img id="s10-img" src="assets/shots/10.jpg" alt="" data-var-src="shot10" /></div>
     </div>
     <div id="shots-flash" class="clip" data-start="0" data-duration="30" data-track-index="11" data-layout-ignore></div>
-    <div id="shots-draft" class="clip" data-start="0" data-duration="30" data-track-index="12">טיוטה · תצוגות מקדימות</div>
   </div>
   <script>
     const tl = gsap.timeline({ paused: true });
