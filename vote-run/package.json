@@ -1,0 +1,23 @@
+{
+  "name": "vote-run",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes hyperframes@0.8.196 preview",
+    "check": "npx --yes hyperframes@0.8.196 check",
+    "render": "npx --yes hyperframes@0.8.196 render",
+    "publish": "npx --yes hyperframes@0.8.196 publish"
+  },
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@fontsource/rubik": "^5.1.0",
+    "esbuild": "^0.24.0",
+    "gsap": "^3.12.5",
+    "three": "^0.170.0"
+  }
+}

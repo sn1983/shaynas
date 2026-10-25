@@ -1,0 +1,20 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      background: #cfe6f5;
+    }
+    #film-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  </style>
+  <div id="root" data-composition-id="film" data-start="0" data-duration="30" data-width="1080" data-height="1920">
+    <canvas id="film-canvas" width="1080" height="1920"></canvas>
+  </div>
+  <script src="assets/js/film.js"></script>
+</template>
