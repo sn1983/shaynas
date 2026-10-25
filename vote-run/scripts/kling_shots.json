@@ -1,0 +1,17 @@
+{
+  "model": "kling-v3",
+  "mode": "std",
+  "negative_prompt": "text, letters, watermark, logo, distorted face, extra limbs, morphing, blurry",
+  "shots": [
+    { "n": 1, "duration": 5, "prompt": "Pixar 3D animation. The man glances at his wristwatch, his eyes go wide in comic panic, he gasps, then spins and bolts out of the doorway. Expressive, snappy cartoon acting, slight handheld camera." },
+    { "n": 2, "duration": 5, "prompt": "Pixar 3D animation. The man sprints straight toward the camera down the sunny Jerusalem-stone street, legs and arms pumping in a full running cycle, hair bouncing. The surprised passer-by in the blue shirt jumps back out of his way. Camera tracks backward fast." },
+    { "n": 3, "duration": 5, "prompt": "Pixar 3D animation. The man hurdles over the stacked fruit crates in one big leap and lands running. Oranges and apples tumble and bounce off the crates, the mustached shopkeeper flails his arms in shock. Dynamic low angle." },
+    { "n": 4, "duration": 5, "prompt": "Pixar 3D animation. The man leaps across the gap between two rooftops, flying through the air with arms outstretched, and lands on the far roof in a roll. The city and the street far below stay steady. Epic slow-motion feel, camera follows the jump." },
+    { "n": 5, "duration": 5, "prompt": "Pixar 3D animation. The man bounces off the red-and-white striped awning like a trampoline, does a joyful flip and lands on the sidewalk. The people below gasp and follow him with their eyes. Low angle camera." },
+    { "n": 6, "duration": 5, "prompt": "Pixar 3D animation. The man runs toward the camera between rows of stopped cars in a traffic jam, weaving left and right with a full running cycle. Drivers lean out of their windows in surprise. Camera dollies back ahead of him." },
+    { "n": 7, "duration": 5, "prompt": "Pixar 3D animation. The man slides sideways across the hood of the white taxi in one smooth action-movie move and hops off the other side, grinning. The startled taxi driver flinches behind the windshield. Low side camera tracking the slide." },
+    { "n": 8, "duration": 5, "prompt": "Pixar 3D animation. The man runs happily toward the camera through the school gate, full running cycle, Israeli flags waving in the breeze above. The smiling elderly woman walks out slowly and waves. Warm golden-hour light." },
+    { "n": 9, "duration": 5, "prompt": "Pixar 3D animation. The man pushes the light-blue envelope down into the slot of the ballot box until it disappears inside, then looks up with a proud smile. The two committee members behind the table smile and clap softly. Gentle camera push-in." },
+    { "n": 10, "duration": 5, "prompt": "Pixar 3D animation. The man grins, tilts his head, and points straight at the camera with an energetic jab, then holds the confident pose. The Israeli flag waves behind him, warm golden-hour light, almost static camera." }
+  ]
+}

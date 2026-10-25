@@ -31,3 +31,18 @@ EOF
 )" assets/reference/hero_sheet.jpg
 ```
 Show the frame to the user and wait for approval before generating anything else.
+
+## Kling path (chosen: real animation of the 10 approved shots)
+Needs, in the environment settings, then a NEW session:
+- secret / env var `KLING_API_KEY` (Kling developer API key, Bearer)
+- Network access: allow `klingai.com` and `*.klingai.com` (API: api-singapore.klingai.com; the result
+  video download host may differ: if a download is refused, add the host named in the proxy error)
+
+Then:
+```bash
+cd vote-run
+python3 scripts/kling_i2v.py --dry-run   # check, spends nothing
+python3 scripts/kling_i2v.py             # 10 clips x 5 s -> assets/clips/{n}.mp4
+```
+Prompts per shot: scripts/kling_shots.json. Then replace the a{n} scene hosts in index.html with
+the clips (trim each to its slot in build_shots.SHOTS), keep music/VO/whooshes/titles, render.
