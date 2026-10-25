@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="he" data-resolution="portrait" data-composition-variables='[{"id":"openTitle","type":"string","label":"Opening chip","default":"יום הבחירות"},{"id":"cta","type":"string","label":"Call to action","default":"צאו להצביע!"}]'>
+<html lang="he" data-resolution="portrait" data-composition-variables='[{"id":"shot1","type":"string","label":"Shot 1 image","default":"assets/shots/1.jpg"},{"id":"shot2","type":"string","label":"Shot 2 image","default":"assets/shots/2.jpg"},{"id":"shot3","type":"string","label":"Shot 3 image","default":"assets/shots/3.jpg"},{"id":"shot4","type":"string","label":"Shot 4 image","default":"assets/shots/4.jpg"},{"id":"shot5","type":"string","label":"Shot 5 image","default":"assets/shots/5.jpg"},{"id":"shot6","type":"string","label":"Shot 6 image","default":"assets/shots/6.jpg"},{"id":"shot7","type":"string","label":"Shot 7 image","default":"assets/shots/7.jpg"},{"id":"shot8","type":"string","label":"Shot 8 image","default":"assets/shots/8.jpg"},{"id":"shot9","type":"string","label":"Shot 9 image","default":"assets/shots/9.jpg"},{"id":"shot10","type":"string","label":"Shot 10 image","default":"assets/shots/10.jpg"},{"id":"openTitle","type":"string","label":"Opening chip","default":"יום הבחירות"},{"id":"cta","type":"string","label":"Call to action","default":"צאו להצביע!"}]'>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=1080, height=1920" />
@@ -12,10 +12,18 @@
   </head>
   <body>
     <div id="root" data-composition-id="main" data-start="0" data-duration="30" data-width="1080" data-height="1920">
-      <div id="film" data-composition-id="film" data-composition-src="compositions/film.html" data-start="0" data-duration="30" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920" style="z-index:1"></div>
+      <div id="shots" data-composition-id="shots" data-composition-src="compositions/shots.html" data-start="0" data-duration="30" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920" style="z-index:1"></div>
       <div id="titles" data-composition-id="titles" data-composition-src="compositions/titles.html" data-start="0" data-duration="30" data-track-index="2" data-track-kind="graphics" data-width="1080" data-height="1920" style="z-index:2"></div>
       <audio id="music" class="clip" src="assets/audio/music.wav" data-start="0" data-duration="30" data-track-index="3" data-volume="0.8"></audio>
-      <audio id="vo" class="clip" src="assets/audio/vo_take1.mp3" data-start="26.7" data-duration="2.85" data-track-index="4" data-volume="1"></audio>
+      <audio id="sfx-whoosh-1" class="clip" src="assets/sfx/whoosh.mp3" data-start="2.27" data-duration="0.57" data-track-index="5" data-volume="0.55"></audio>
+      <audio id="sfx-whoosh-2" class="clip" src="assets/sfx/whoosh-short.mp3" data-start="5.47" data-duration="0.57" data-track-index="5" data-volume="0.55"></audio>
+      <audio id="sfx-whoosh-3" class="clip" src="assets/sfx/whoosh.mp3" data-start="7.87" data-duration="0.57" data-track-index="5" data-volume="0.55"></audio>
+      <audio id="sfx-whoosh-4" class="clip" src="assets/sfx/whoosh-short.mp3" data-start="14.27" data-duration="0.57" data-track-index="5" data-volume="0.55"></audio>
+      <audio id="sfx-whoosh-5" class="clip" src="assets/sfx/whoosh.mp3" data-start="17.47" data-duration="0.57" data-track-index="5" data-volume="0.55"></audio>
+      <audio id="sfx-whoosh-6" class="clip" src="assets/sfx/whoosh-short.mp3" data-start="20.67" data-duration="0.57" data-track-index="5" data-volume="0.55"></audio>
+      <audio id="sfx-whoosh-7" class="clip" src="assets/sfx/whoosh.mp3" data-start="23.07" data-duration="0.57" data-track-index="5" data-volume="0.55"></audio>
+      <audio id="sfx-impact-1" class="clip" src="assets/sfx/impact-bass-1.mp3" data-start="11.2" data-duration="2.1" data-track-index="6" data-volume="0.7"></audio>
+      <audio id="vo" class="clip" src="assets/audio/vo_take1.mp3" data-start="26.7" data-duration="2.8" data-track-index="4" data-volume="1"></audio>
     </div>
     <script>
       window.__timelines = window.__timelines || {};

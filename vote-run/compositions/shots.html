@@ -1,0 +1,108 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: #0b1530; overflow: hidden; }
+    .shot { position: absolute; inset: 0; overflow: hidden; }
+    .cam { position: absolute; inset: 0; will-change: transform; }
+    .cam img { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; }
+    #shots-flash { position: absolute; inset: 0; background: #fff8e6; opacity: 0; }
+    #shots-draft {
+      position: absolute; top: 176px; left: 40px; padding: 8px 18px 10px; border-radius: 12px;
+      background: rgba(10, 20, 50, 0.6); color: #fff; font: 700 30px "Rubik", sans-serif; direction: rtl;
+    }
+  </style>
+  <div id="root" data-composition-id="shots" data-start="0" data-duration="30" data-width="1080" data-height="1920">
+    <div id="s1" class="clip shot" data-start="0.0" data-duration="2.4" data-track-index="1">
+      <div id="s1-cam" class="cam"><img id="s1-img" src="assets/shots/1.jpg" alt="" data-var-src="shot1" /></div>
+    </div>
+    <div id="s2" class="clip shot" data-start="2.4" data-duration="3.2" data-track-index="2">
+      <div id="s2-cam" class="cam"><img id="s2-img" src="assets/shots/2.jpg" alt="" data-var-src="shot2" /></div>
+    </div>
+    <div id="s3" class="clip shot" data-start="5.6" data-duration="2.4" data-track-index="3">
+      <div id="s3-cam" class="cam"><img id="s3-img" src="assets/shots/3.jpg" alt="" data-var-src="shot3" /></div>
+    </div>
+    <div id="s4" class="clip shot" data-start="8.0" data-duration="3.2" data-track-index="4">
+      <div id="s4-cam" class="cam"><img id="s4-img" src="assets/shots/4.jpg" alt="" data-var-src="shot4" /></div>
+    </div>
+    <div id="s5" class="clip shot" data-start="11.2" data-duration="3.2" data-track-index="5">
+      <div id="s5-cam" class="cam"><img id="s5-img" src="assets/shots/5.jpg" alt="" data-var-src="shot5" /></div>
+    </div>
+    <div id="s6" class="clip shot" data-start="14.4" data-duration="3.2" data-track-index="6">
+      <div id="s6-cam" class="cam"><img id="s6-img" src="assets/shots/6.jpg" alt="" data-var-src="shot6" /></div>
+    </div>
+    <div id="s7" class="clip shot" data-start="17.6" data-duration="3.2" data-track-index="7">
+      <div id="s7-cam" class="cam"><img id="s7-img" src="assets/shots/7.jpg" alt="" data-var-src="shot7" /></div>
+    </div>
+    <div id="s8" class="clip shot" data-start="20.8" data-duration="2.4" data-track-index="8">
+      <div id="s8-cam" class="cam"><img id="s8-img" src="assets/shots/8.jpg" alt="" data-var-src="shot8" /></div>
+    </div>
+    <div id="s9" class="clip shot" data-start="23.2" data-duration="3.2" data-track-index="9">
+      <div id="s9-cam" class="cam"><img id="s9-img" src="assets/shots/9.jpg" alt="" data-var-src="shot9" /></div>
+    </div>
+    <div id="s10" class="clip shot" data-start="26.4" data-duration="3.6" data-track-index="10">
+      <div id="s10-cam" class="cam"><img id="s10-img" src="assets/shots/10.jpg" alt="" data-var-src="shot10" /></div>
+    </div>
+    <div id="shots-flash" class="clip" data-start="0" data-duration="30" data-track-index="11" data-layout-ignore></div>
+    <div id="shots-draft" class="clip" data-start="0" data-duration="30" data-track-index="12">טיוטה · תצוגות מקדימות</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.set("#shots-flash", { opacity: 0 }, 0);
+    // seeded handheld shake: small position/rotation jitter, 15 steps a second
+    function rng(seed) { let a = seed; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+    function shake(sel, t0, t1, amp, seed) {
+      const r = rng(seed);
+      for (let t = t0; t < t1 - 0.001; t += 1 / 15) {
+        tl.to(sel + " img", { x: (r() - 0.5) * amp, y: (r() - 0.5) * amp, rotation: (r() - 0.5) * amp * 0.03, duration: 1 / 15, ease: "sine.inOut" }, t);
+      }
+      tl.to(sel + " img", { x: 0, y: 0, rotation: 0, duration: 0.1 }, t1 - 0.1);
+    }
+    const cam = (n, from, to, start, dur, ease = "none") => tl.fromTo("#s" + n + "-cam", from, { ...to, duration: dur, ease }, start);
+
+    // 1 — the realization: slow push, then a snap punch-in on the shock beat
+    cam(1, { scale: 1.06, x: 0, y: 0 }, { scale: 1.12, y: 20 }, 0, 0.9, "power1.inOut");
+    tl.to("#s1-cam", { scale: 1.32, y: 120, duration: 0.18, ease: "expo.out" }, 0.9);
+    tl.to("#s1-cam", { scale: 1.38, duration: 1.3, ease: "none" }, 1.08);
+    shake("#s1", 0.9, 1.4, 14, 1);
+
+    // 2 — sprinting toward us: strong push in, running shake
+    cam(2, { scale: 1.05, y: 0 }, { scale: 1.3, y: 60 }, 2.4, 3.2, "power1.in");
+    shake("#s2", 2.4, 5.6, 16, 2);
+
+    // 3 — the hurdle: tilt up with the jump
+    cam(3, { scale: 1.25, y: 140 }, { scale: 1.15, y: -60 }, 5.6, 2.4, "power2.out");
+    shake("#s3", 5.6, 8.0, 10, 3);
+
+    // 4 — the rooftop leap: floaty, slow drift and rise (the music breaks down here)
+    cam(4, { scale: 1.12, x: -40, y: 80 }, { scale: 1.28, x: 40, y: -40 }, 8.0, 3.2, "sine.inOut");
+
+    // 5 — awning bounce: lands on the impact, then drops with him
+    cam(5, { scale: 1.3, y: 250 }, { scale: 1.12, y: 120 }, 11.2, 3.2, "power2.in");
+    shake("#s5", 11.2, 11.7, 34, 5);
+    tl.set("#shots-flash", { opacity: 0.85 }, 11.2);
+    tl.to("#shots-flash", { opacity: 0, duration: 0.3, ease: "power2.out" }, 11.2);
+
+    // 6 — traffic jam: crane down from high
+    cam(6, { scale: 1.3, y: 220 }, { scale: 1.1, y: -40 }, 14.4, 3.2, "power2.inOut");
+    shake("#s6", 14.4, 17.6, 8, 6);
+
+    // 7 — hood slide: whip in from the side, track with the slide
+    cam(7, { scale: 1.2, x: 260, filter: "blur(14px)" }, { scale: 1.2, x: 0, filter: "blur(0px)" }, 17.6, 0.3, "expo.out");
+    tl.to("#s7-cam", { x: -90, scale: 1.26, duration: 2.9, ease: "none" }, 17.9);
+    shake("#s7", 17.6, 20.8, 10, 7);
+
+    // 8 — arriving at the polling station: push in toward the gate
+    cam(8, { scale: 1.05, y: 0 }, { scale: 1.25, y: 40 }, 20.8, 2.4, "power1.inOut");
+    shake("#s8", 20.8, 23.2, 8, 8);
+
+    // 9 — the envelope: slow push to the ballot box, settle
+    cam(9, { scale: 1.08, x: 0, y: 0 }, { scale: 1.24, x: 60, y: 140 }, 23.2, 3.2, "power2.inOut");
+
+    // 10 — end card: lands on the impact, then holds nearly still
+    cam(10, { scale: 1.22, y: 60 }, { scale: 1.06, y: 0 }, 26.4, 0.6, "expo.out");
+    tl.to("#s10-cam", { scale: 1.03, duration: 3.0, ease: "none" }, 27.0);
+    tl.set("#shots-flash", { opacity: 0.7 }, 26.4);
+    tl.to("#shots-flash", { opacity: 0, duration: 0.35, ease: "power2.out" }, 26.4);
+
+    window.__timelines["shots"] = tl;
+  </script>
+</template>
