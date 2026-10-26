@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "lipsync": {
+      "source": "agentspace-so/runcomfy-agent-skills",
+      "sourceType": "github",
+      "skillPath": "lipsync/SKILL.md",
+      "computedHash": "f8d47a2f1cbe9620acd012d796f0149d8858f77996883e23d0433a3e5d539fe6"
+    }
+  }
+}
