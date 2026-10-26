@@ -1,0 +1,108 @@
+<template>
+  <style>
+    @font-face { font-family: "Rubik"; font-weight: 900; src: url("assets/fonts/rubik-hebrew-900-normal.woff2") format("woff2"); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+    @font-face { font-family: "Rubik"; font-weight: 900; src: url("assets/fonts/rubik-latin-900-normal.woff2") format("woff2"); unicode-range: U+0000-00FF; }
+    @font-face { font-family: "Rubik"; font-weight: 700; src: url("assets/fonts/rubik-hebrew-700-normal.woff2") format("woff2"); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+    #root {
+      position: absolute;
+      inset: 0;
+      font-family: "Rubik", sans-serif;
+      direction: rtl;
+      pointer-events: none;
+    }
+    #titles-vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 75% 60% at 50% 48%, rgba(0, 0, 0, 0) 55%, rgba(20, 12, 40, 0.38) 100%);
+    }
+    #titles-chip {
+      position: absolute;
+      top: 180px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+    }
+    #titles-chip-inner {
+      display: inline-block;
+      padding: 18px 44px 22px;
+      border-radius: 999px;
+      background: #0038b8;
+      color: #ffffff;
+      font-weight: 900;
+      font-size: 56px;
+      letter-spacing: 0.01em;
+      box-shadow: 0 14px 40px rgba(0, 20, 80, 0.35);
+    }
+    #titles-scrim {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 900px;
+      background: linear-gradient(180deg, rgba(8, 20, 60, 0.55) 0%, rgba(8, 20, 60, 0.3) 55%, rgba(8, 20, 60, 0) 100%);
+    }
+    #titles-end {
+      position: absolute;
+      top: 230px;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 26px;
+    }
+    #titles-line1 {
+      display: flex;
+      gap: 28px;
+      color: #ffffff;
+      font-weight: 900;
+      font-size: 148px;
+      line-height: 1;
+      text-shadow: 0 6px 0 #0a2a7a, 0 18px 40px rgba(0, 20, 60, 0.45);
+    }
+    .titles-w {
+      display: inline-block;
+    }
+    #titles-line2 {
+      display: inline-block;
+      padding: 16px 54px 24px;
+      border-radius: 34px;
+      background: #0038b8;
+      color: #ffffff;
+      font-weight: 900;
+      font-size: 112px;
+      line-height: 1.05;
+      box-shadow: 0 16px 0 #00246f, 0 26px 50px rgba(0, 20, 80, 0.4);
+    }
+  </style>
+  <div id="root" data-composition-id="titles" data-start="0" data-duration="30" data-width="1080" data-height="1920">
+    <div id="titles-vignette" class="clip" data-start="0" data-duration="30" data-layout-ignore></div>
+    <div id="titles-chip" class="clip" data-start="0" data-duration="1.6">
+      <span id="titles-chip-inner" data-var-text="openTitle">יום הבחירות</span>
+    </div>
+    <div id="titles-scrim" class="clip" data-start="26.4" data-duration="3.6" data-layout-ignore></div>
+    <div id="titles-end" class="clip" data-start="26.4" data-duration="3.6">
+      <div id="titles-line1">
+        <span class="titles-w" id="titles-w1">כל</span>
+        <span class="titles-w" id="titles-w2">קול</span>
+        <span class="titles-w" id="titles-w3">חשוב</span>
+      </div>
+      <div id="titles-line2" data-var-text="cta">צאו להצביע!</div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#titles-chip-inner", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(1.6)" }, 0);
+    tl.to("#titles-chip-inner", { opacity: 0, y: -30, filter: "blur(6px)", duration: 0.2, ease: "power3.in" }, 1.38);
+    // words land on the voiceover: "כל קול חשוב" ~26.75-27.6, "צאו להצביע" ~27.8
+    const words = ["#titles-w1", "#titles-w2", "#titles-w3"];
+    const at = [26.72, 26.98, 27.24];
+    words.forEach((w, i) => {
+      tl.fromTo(w, { opacity: 0, y: 40, scale: 1.4, filter: "blur(8px)" }, { opacity: 1, y: 0, scale: 1, filter: "blur(0px)", duration: 0.24, ease: "expo.out" }, at[i]);
+    });
+    tl.fromTo("#titles-scrim", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.inOut" }, 26.45);
+    tl.fromTo("#titles-line2", { opacity: 0, scale: 0.4, rotation: -6 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.45, ease: "back.out(2)" }, 27.82);
+    window.__timelines["titles"] = tl;
+  </script>
+</template>

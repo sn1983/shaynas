@@ -1,0 +1,30 @@
+<template>
+  <style>
+    @font-face { font-family: "Rubik"; font-weight: 900; src: url("assets/fonts/rubik-hebrew-900-normal.woff2") format("woff2"); unicode-range: U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+    #root { position: absolute; inset: 0; pointer-events: none; direction: rtl; }
+    #sign-text {
+      font-family: "Rubik", sans-serif;
+      position: absolute;
+      left: 560px;
+      top: 92px;
+      width: 760px;
+      height: 190px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 150px;
+      line-height: 1;
+      color: #0038b8;
+    }
+  </style>
+  <div id="root" data-composition-id="sign" data-start="0" data-duration="2.8" data-width="1920" data-height="1080">
+    <div id="sign-text" class="clip" data-start="0" data-duration="2.8">קלפי</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // the blank board over the school gate reads "קלפי"; it drifts with the clip's slow camera
+    tl.fromTo("#sign-text", { y: 0 }, { y: 14, duration: 2.8, ease: "none" }, 0);
+    window.__timelines["sign"] = tl;
+  </script>
+</template>
