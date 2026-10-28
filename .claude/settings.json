@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "claudemy": {
+      "source": {
+        "source": "github",
+        "repo": "assafkip/claudemy"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "claudemy@claudemy": true
+  }
+}
